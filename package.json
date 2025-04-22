@@ -1,0 +1,38 @@
+{
+  "name": "admin-dashboard",
+  "version": "1.0.0",
+  "description": "Admin dashboard using Node.js, TypeScript, Tailwind CSS",
+  "main": "dist/index.js",
+  "scripts": {
+    "build:ts": "tsc",
+    "build:css": "tailwindcss -i ./src/styles.css -o ./public/styles.css",
+    "build": "npm run build:ts && npm run build:css",
+    "start": "node dist/index.js",
+    "dev": "concurrently \"npm:watch:ts\" \"npm:watch:css\" \"npm:dev:server\"",
+    "watch:ts": "tsc -w",
+    "watch:css": "tailwindcss -i ./src/styles.css -o ./public/styles.css --watch",
+    "dev:server": "nodemon dist/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@slack/bolt": "^3.17.1",
+    "@supabase/supabase-js": "^2.43.4",
+    "express": "^4.19.2",
+    "nodemailer": "^6.9.13",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.12.12",
+    "@types/nodemailer": "^6.4.15",
+    "autoprefixer": "^10.4.19",
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.1.0",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}
