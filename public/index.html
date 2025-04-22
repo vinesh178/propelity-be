@@ -562,6 +562,9 @@
                     const section = link.getAttribute('data-section');
                     showSection(section);
                     
+                    // Store the active section in localStorage
+                    localStorage.setItem('activeDashboardSection', section);
+                    
                     // Load data for the selected section
                     if (section === 'enquiries') {
                         loadEnquiriesData();
@@ -571,10 +574,18 @@
                 });
             });
             
-            // Show default section
-            const defaultSection = 'enquiries';
-            showSection(defaultSection);
-            loadEnquiriesData();
+            // Get the active section from localStorage, or default to 'enquiries'
+            const activeSection = localStorage.getItem('activeDashboardSection') || 'enquiries';
+            
+            // Show the active section
+            showSection(activeSection);
+            
+            // Load data for the active section
+            if (activeSection === 'enquiries') {
+                loadEnquiriesData();
+            } else if (activeSection === 'users') {
+                loadUsersData();
+            }
             
             // Set up modal close button
             document.getElementById('close-user-modal').addEventListener('click', () => {
