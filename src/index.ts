@@ -7,12 +7,13 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 // Import after environment variables are loaded
 import { getAllEnquiries } from './enquiries';
-import { fetchUsers, fetchUserById } from './users';
+import { fetchUsers, fetchUserById, updateUser } from './users';
 
 const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(express.static('public'));
+app.use(express.json()); // Add middleware to parse JSON bodies
 
 // API endpoint to fetch enquiries
 app.get('/api/enquiries', async (req: Request, res: Response) => {
@@ -27,8 +28,13 @@ app.get('/api/enquiries', async (req: Request, res: Response) => {
       return res.status(500).json({ message: 'Failed to fetch enquiries', error: error.message });
     }
     
+    if (!data || data.length === 0) {
+      console.log('No enquiries found');
+      return res.json([]);
+    }
+    
     // Send the fetched data
-    console.log(`Sending ${data?.length || 0} enquiries to client`);
+    console.log(`Sending ${data.length} enquiries to client`);
     return res.json(data);
   } catch (err) {
     console.error('Unexpected error in /api/enquiries endpoint:', err);
@@ -57,12 +63,8 @@ app.get('/api/users', async (req: Request, res: Response) => {
 
 // API endpoint to fetch a specific user by ID
 app.get('/api/users/:id', async (req: Request, res: Response) => {
-  const userId = parseInt(req.params.id);
+  const userId = req.params.id;
   console.log(`Received request to /api/users/${userId}`);
-  
-  if (isNaN(userId)) {
-    return res.status(400).json({ message: 'Invalid user ID' });
-  }
   
   try {
     const { data, error } = await fetchUserById(userId);
@@ -80,6 +82,32 @@ app.get('/api/users/:id', async (req: Request, res: Response) => {
     return res.json(data);
   } catch (err) {
     console.error(`Unexpected error in /api/users/${userId} endpoint:`, err);
+    return res.status(500).json({ message: 'Internal server error', error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// API endpoint to update a user
+app.put('/api/users/:id', async (req: Request, res: Response) => {
+  const userId = req.params.id;
+  const updates = req.body;
+  console.log(`Received request to update user ${userId}:`, updates);
+  
+  try {
+    const { data, error } = await updateUser(userId, updates);
+    
+    if (error) {
+      console.error(`Error updating user ${userId}:`, error);
+      return res.status(500).json({ message: 'Failed to update user', error: error.message });
+    }
+    
+    if (!data) {
+      return res.status(404).json({ message: 'User not found or no update performed' });
+    }
+    
+    console.log(`Successfully updated user ${userId}`);
+    return res.json(data);
+  } catch (err) {
+    console.error(`Unexpected error in PUT /api/users/${userId} endpoint:`, err);
     return res.status(500).json({ message: 'Internal server error', error: err instanceof Error ? err.message : String(err) });
   }
 });

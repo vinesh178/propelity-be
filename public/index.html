@@ -71,17 +71,6 @@
                                     </tr>
                                 </thead>
                                 <tbody id="enquiries-table-body" class="bg-white divide-y divide-gray-200">
-                                    <tr>
-                                        <td colspan="1" class="px-6 py-4 text-center text-sm text-gray-500">
-                                            <div class="flex justify-center items-center">
-                                                <svg class="animate-spin h-5 w-5 mr-3 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                </svg>
-                                                Loading enquiries...
-                                            </div>
-                                        </td>
-                                    </tr>
                                 </tbody>
                             </table>
                         </div>
@@ -100,9 +89,21 @@
                 <div id="users-section" class="content-section hidden">
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-lg font-semibold text-gray-800">Users</h2>
+                        <div class="text-sm text-gray-500" id="users-count">Loading users...</div>
                     </div>
-                    <div class="bg-white shadow-sm rounded-lg p-6">
-                        <p class="text-gray-500">User data will be displayed here.</p>
+                    
+                    <div class="bg-white shadow-sm rounded-lg overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200" id="users-table">
+                                <thead class="bg-gray-50" id="users-table-head">
+                                    <tr>
+                                        <th class="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider text-left">Loading columns...</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="users-table-body" class="bg-white divide-y divide-gray-200">
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
@@ -119,16 +120,14 @@
         </main>
     </div>
 
-    <div id="user-details-modal" class="fixed inset-0 bg-gray-500 bg-opacity-75 hidden">
-        <div class="flex items-center justify-center h-full">
-            <div class="bg-white shadow-md rounded-lg p-6 w-96">
-                <button id="close-user-modal" class="text-gray-500 hover:text-gray-700 transition-colors float-right">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-                <div id="user-details-content"></div>
-            </div>
+    <!-- User Details Modal -->
+    <div id="user-modal" class="fixed inset-0 z-50 hidden bg-black bg-opacity-30 flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-lg w-full max-w-lg p-6 relative">
+            <button id="close-user-modal" class="absolute left-4 top-4 text-gray-500 hover:text-gray-700 text-2xl">←</button>
+            <h2 class="text-xl font-bold mb-4">User Details</h2>
+            <form id="user-details-form" class="space-y-4"></form>
+            <div id="user-modal-error" class="text-red-600 mt-2 hidden"></div>
+            <button id="save-user-btn" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save</button>
         </div>
     </div>
 
@@ -143,19 +142,13 @@
                 }
                 const data = await response.json();
                 console.log('Received enquiries data:', data);
-                
-                // Check if data is null or undefined
-                if (!data) {
-                    console.error('No data received from API');
-                    return [];
-                }
-                
-                return data;
+                return data || [];
             } catch (error) {
                 console.error('Error fetching enquiries:', error);
                 return [];
             }
         }
+
         // Function to fetch users from the API
         async function fetchUsers() {
             try {
@@ -166,38 +159,13 @@
                 }
                 const data = await response.json();
                 console.log('Received users data:', data);
-                
-                // Check if data is null or undefined
-                if (!data) {
-                    console.error('No users data received from API');
-                    return [];
-                }
-                
-                return data;
+                return data || [];
             } catch (error) {
                 console.error('Error fetching users:', error);
-                const countElement = document.getElementById('users-count');
-                if (countElement) {
-                    countElement.textContent = `Error: ${error.message}`;
-                }
                 return [];
             }
         }
 
-        // Function to fetch a specific user by ID
-        async function fetchUserById(userId) {
-            try {
-                const response = await fetch(`/api/users/${userId}`);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-                const data = await response.json();
-                return data;
-            } catch (error) {
-                console.error(`Error fetching user ${userId}:`, error);
-                return null;
-            }
-        }
         // Function to display enquiries in the table
         function displayEnquiries(enquiries) {
             const tableHead = document.getElementById('enquiries-table-head');
@@ -214,8 +182,11 @@
             }
             
             if (enquiries && enquiries.length > 0) {
-                // Define the display order for columns
-                const displayOrder = [
+                // Get all available columns from the first enquiry
+                const columns = Object.keys(enquiries[0]);
+                
+                // Create preferred display order (put important columns first)
+                const preferredOrder = [
                     'id', 
                     'first_name',
                     'last_name',
@@ -223,59 +194,53 @@
                     'phone',
                     'budget_range',
                     'service_type',
-                    'additional_info',
-                    'created_at',
-                    'user_id',
-                    'recaptcha_token'
+                    'created_at'
                 ];
                 
-                // Filter columns that exist in the data
-                const availableColumns = Object.keys(enquiries[0]);
-                const columns = displayOrder.filter(col => availableColumns.includes(col));
+                // Create final column order (preferred columns first, then any remaining columns)
+                const displayColumns = [
+                    ...preferredOrder.filter(col => columns.includes(col)),
+                    ...columns.filter(col => !preferredOrder.includes(col) && col !== 'recaptcha_token')
+                ];
                 
-                // Add any columns that might be in the data but not in our predefined order
-                availableColumns.forEach(col => {
-                    if (!columns.includes(col)) {
-                        columns.push(col);
-                    }
-                });
-                
-                // Create table headers
-                const headRow = document.createElement('tr');
-                columns.forEach(col => {
+                // Table header
+                const headerRow = document.createElement('tr');
+                displayColumns.forEach(col => {
                     const th = document.createElement('th');
                     th.className = 'px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider text-left';
-                    
-                    // Format column names for display
-                    let displayName = col.replace(/_/g, ' ');
-                    displayName = displayName.charAt(0).toUpperCase() + displayName.slice(1);
+                    // Format column name for display
+                    const displayName = col.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                     th.textContent = displayName;
-                    
-                    headRow.appendChild(th);
+                    headerRow.appendChild(th);
                 });
-                tableHead.appendChild(headRow);
-                
-                // Populate rows
+                tableHead.appendChild(headerRow);
+
+                // Table rows
                 enquiries.forEach(enquiry => {
                     const row = document.createElement('tr');
-                    row.className = 'hover:bg-gray-50 transition-colors';
+                    row.className = 'hover:bg-gray-50';
                     
-                    columns.forEach(col => {
+                    displayColumns.forEach(col => {
                         const td = document.createElement('td');
                         td.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-left';
                         let value = enquiry[col];
                         
-                        // Format created_at as date/time if present
+                        // Format created_at as date/time
                         if (col === 'created_at' && value) {
                             value = new Date(value).toLocaleString();
                         }
                         
-                        // Format recaptcha_token to show Present/Absent
-                        if (col === 'recaptcha_token') {
-                            value = value ? 'Present' : 'Absent';
+                        // Format boolean values
+                        if (typeof value === 'boolean') {
+                            value = value ? 'Yes' : 'No';
                         }
                         
-                        // Handle null or undefined values
+                        // Truncate long values
+                        if (typeof value === 'string' && value.length > 100) {
+                            td.title = value; // Show full value on hover
+                            value = value.substring(0, 100) + '...';
+                        }
+                        
                         td.textContent = value !== undefined && value !== null ? String(value) : 'N/A';
                         row.appendChild(td);
                     });
@@ -286,7 +251,7 @@
                 // Display a message if no enquiries are found
                 const row = document.createElement('tr');
                 const cell = document.createElement('td');
-                cell.colSpan = 1;
+                cell.colSpan = 11; // Adjust based on expected number of columns
                 cell.className = 'px-6 py-4 text-center text-sm text-gray-500';
                 cell.textContent = 'No enquiries found.';
                 row.appendChild(cell);
@@ -313,38 +278,51 @@
             }
             
             if (users && users.length > 0) {
-                // Define which columns to display and in what order
-                const displayColumns = ['id', 'first_name', 'last_name', 'email', 'phone', 'created_at'];
+                // Define the display order for columns
+                const displayOrder = [
+                    'id', 
+                    'first_name',
+                    'last_name',
+                    'email',
+                    'phone',
+                    'isAdmin',
+                    'isSubscribed',
+                    'created_at'
+                ];
+                
+                // Filter columns that exist in the data
+                const availableColumns = Object.keys(users[0]);
+                const columns = displayOrder.filter(col => availableColumns.includes(col));
+                
+                // Add any columns that might be in the data but not in our predefined order
+                availableColumns.forEach(col => {
+                    if (!columns.includes(col)) {
+                        columns.push(col);
+                    }
+                });
                 
                 // Create table headers
                 const headRow = document.createElement('tr');
-                displayColumns.forEach(col => {
+                columns.forEach(col => {
                     const th = document.createElement('th');
                     th.className = 'px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider text-left';
+                    
                     // Format column names for display
                     let displayName = col.replace(/_/g, ' ');
                     displayName = displayName.charAt(0).toUpperCase() + displayName.slice(1);
                     th.textContent = displayName;
+                    
                     headRow.appendChild(th);
                 });
-                // Add an actions column
-                const actionsHeader = document.createElement('th');
-                actionsHeader.className = 'px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider text-right';
-                actionsHeader.textContent = 'Actions';
-                headRow.appendChild(actionsHeader);
                 
                 tableHead.appendChild(headRow);
                 
                 // Populate rows
                 users.forEach(user => {
                     const row = document.createElement('tr');
-                    row.className = 'hover:bg-gray-50 transition-colors cursor-pointer';
-                    row.setAttribute('data-user-id', user.id);
+                    row.className = 'hover:bg-gray-50 transition-colors';
                     
-                    // Add click event to show user details
-                    row.addEventListener('click', () => showUserDetails(user.id));
-                    
-                    displayColumns.forEach(col => {
+                    columns.forEach(col => {
                         const td = document.createElement('td');
                         td.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-left';
                         let value = user[col];
@@ -354,24 +332,28 @@
                             value = new Date(value).toLocaleString();
                         }
                         
-                        td.textContent = value !== undefined && value !== null ? String(value) : 'N/A';
+                        // Format boolean values
+                        if (typeof value === 'boolean') {
+                            value = value ? 'Yes' : 'No';
+                        }
+                        
+                        // Make the id open user modal
+                        if (col === 'id') {
+                            const a = document.createElement('a');
+                            a.href = '#';
+                            a.className = 'text-blue-600 hover:underline cursor-pointer';
+                            a.textContent = value;
+                            a.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                openUserModal(value); // Use the UUID directly
+                            });
+                            td.textContent = '';
+                            td.appendChild(a);
+                        } else {
+                            td.textContent = value !== undefined && value !== null ? String(value) : 'N/A';
+                        }
                         row.appendChild(td);
                     });
-                    
-                    // Add view details button
-                    const actionsCell = document.createElement('td');
-                    actionsCell.className = 'px-6 py-4 whitespace-nowrap text-sm text-right';
-                    
-                    const viewButton = document.createElement('button');
-                    viewButton.className = 'text-blue-600 hover:text-blue-800 font-medium';
-                    viewButton.textContent = 'View Details';
-                    viewButton.addEventListener('click', (e) => {
-                        e.stopPropagation(); // Prevent row click event
-                        showUserDetails(user.id);
-                    });
-                    
-                    actionsCell.appendChild(viewButton);
-                    row.appendChild(actionsCell);
                     
                     tableBody.appendChild(row);
                 });
@@ -387,64 +369,160 @@
             }
         }
 
-        // Function to show user details in a modal
-        async function showUserDetails(userId) {
-            const modal = document.getElementById('user-details-modal');
-            const contentDiv = document.getElementById('user-details-content');
+        // Function to load enquiries data
+        async function loadEnquiriesData() {
+            const tableBody = document.getElementById('enquiries-table-body');
+            const countElement = document.getElementById('enquiries-count');
             
-            // Show loading state
-            contentDiv.innerHTML = `
-                <div class="flex justify-center items-center">
-                    <svg class="animate-spin h-5 w-5 mr-3 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Loading user details...
-                </div>
-            `;
-            
-            // Show the modal
-            modal.classList.remove('hidden');
-            
-            // Fetch user details
-            const user = await fetchUserById(userId);
-            
-            if (user) {
-                // Create a formatted display of user details
-                let html = '<div class="space-y-4">';
-                
-                // User name header
-                html += `<h4 class="text-xl font-medium text-gray-900">${user.first_name} ${user.last_name}</h4>`;
-                
-                // User details grid
-                html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">';
-                
-                // Format each field
-                const fields = [
-                    { label: 'User ID', value: user.id },
-                    { label: 'Email', value: user.email },
-                    { label: 'Phone', value: user.phone || 'N/A' },
-                    { label: 'Created At', value: user.created_at ? new Date(user.created_at).toLocaleString() : 'N/A' },
-                    { label: 'Subscribed', value: user.issubscribed ? 'Yes' : 'No' },
-                    { label: 'Admin', value: user.isAdmin ? 'Yes' : 'No' }
-                ];
-                
-                fields.forEach(field => {
-                    html += `
-                        <div class="bg-gray-50 p-3 rounded">
-                            <p class="text-xs font-medium text-gray-500">${field.label}</p>
-                            <p class="text-sm font-medium text-gray-900">${field.value}</p>
+            // Show loading indicator
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="10" class="px-6 py-4 text-center text-sm text-gray-500">
+                        <div class="flex justify-center items-center">
+                            <svg class="animate-spin h-5 w-5 mr-3 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Loading enquiries...
                         </div>
-                    `;
-                });
-                
-                html += '</div>';
-                
-                contentDiv.innerHTML = html;
-            } else {
-                contentDiv.innerHTML = '<p class="text-gray-500">User not found.</p>';
+                    </td>
+                </tr>
+            `;
+            countElement.textContent = 'Loading enquiries...';
+            
+            const enquiries = await fetchEnquiries();
+            displayEnquiries(enquiries);
+        }
+
+        // Function to load users data
+        async function loadUsersData() {
+            const tableBody = document.getElementById('users-table-body');
+            const countElement = document.getElementById('users-count');
+            
+            // Show loading indicator
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="10" class="px-6 py-4 text-center text-sm text-gray-500">
+                        <div class="flex justify-center items-center">
+                            <svg class="animate-spin h-5 w-5 mr-3 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Loading users...
+                        </div>
+                    </td>
+                </tr>
+            `;
+            countElement.textContent = 'Loading users...';
+            
+            const users = await fetchUsers();
+            displayUsers(users);
+        }
+
+        // Variable to track current user ID being edited
+        let currentUserId = null;
+
+        // Function to open user modal and load user details
+        async function openUserModal(userId) {
+            currentUserId = userId; // Store the UUID being edited
+            const userModal = document.getElementById('user-modal');
+            const userDetailsForm = document.getElementById('user-details-form');
+            const userModalError = document.getElementById('user-modal-error');
+            
+            userModalError.classList.add('hidden');
+            userDetailsForm.innerHTML = '<div class="text-gray-600">Loading...</div>';
+            userModal.classList.remove('hidden');
+            
+            try {
+                // Use the REST API endpoint for fetching user
+                const response = await fetch(`/api/users/${userId}`);
+                if (!response.ok) {
+                    userDetailsForm.innerHTML = '';
+                    userModalError.textContent = `Error loading user. (${response.status})`;
+                    userModalError.classList.remove('hidden');
+                    return;
+                }
+                const data = await response.json();
+                if (!data || Object.keys(data).length === 0) {
+                    userDetailsForm.innerHTML = '';
+                    userModalError.textContent = 'User not found.';
+                    userModalError.classList.remove('hidden');
+                    return;
+                }
+                renderUserForm(data);
+            } catch (err) {
+                userDetailsForm.innerHTML = '';
+                userModalError.textContent = 'Error loading user.';
+                userModalError.classList.remove('hidden');
+                console.error('Error loading user:', err);
             }
         }
+
+        // Function to render user form
+        function renderUserForm(user) {
+            const userDetailsForm = document.getElementById('user-details-form');
+            userDetailsForm.innerHTML = '';
+            Object.entries(user).forEach(([key, value]) => {
+                // Don't allow editing id, created_at, updated_at
+                const readonly = ['id', 'created_at', 'updated_at'].includes(key);
+                const label = document.createElement('label');
+                label.className = 'block text-sm font-medium text-gray-700';
+                label.textContent = key;
+                const input = document.createElement('input');
+                input.className = 'mt-1 block w-full border border-gray-300 rounded px-2 py-1';
+                input.type = 'text';
+                input.value = value !== null && value !== undefined ? value : '';
+                input.name = key;
+                if (readonly) {
+                    input.readOnly = true;
+                    input.classList.add('bg-gray-100');
+                }
+                label.appendChild(input);
+                userDetailsForm.appendChild(label);
+            });
+        }
+
+        // Save user button click event handler
+        const saveUserBtn = document.getElementById('save-user-btn');
+        saveUserBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const userModalError = document.getElementById('user-modal-error');
+            userModalError.classList.add('hidden');
+            const userDetailsForm = document.getElementById('user-details-form');
+            const formData = new FormData(userDetailsForm);
+            const updateData = {};
+            for (const [key, value] of formData.entries()) {
+                if (!['id', 'created_at', 'updated_at'].includes(key)) {
+                    updateData[key] = value;
+                }
+            }
+            try {
+                // Use REST API instead of direct Supabase client
+                const response = await fetch(`/api/users/${currentUserId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(updateData)
+                });
+                
+                if (!response.ok) {
+                    userModalError.textContent = 'Error updating user.';
+                    userModalError.classList.remove('hidden');
+                    return;
+                }
+                
+                const userModal = document.getElementById('user-modal');
+                userModal.classList.add('hidden');
+                userDetailsForm.innerHTML = '';
+                // Refresh users table
+                fetchAndDisplayUsers();
+            } catch (err) {
+                userModalError.textContent = 'Error updating user.';
+                userModalError.classList.remove('hidden');
+                console.error('Error updating user:', err);
+            }
+        });
 
         // Function to show a specific section and hide others
         function showSection(sectionId) {
@@ -470,48 +548,11 @@
                 activeLink.classList.add('bg-blue-50', 'text-blue-600', 'border-blue-600');
                 activeLink.classList.remove('border-transparent', 'text-gray-700');
             }
+            
+            // Save the active section to localStorage
+            localStorage.setItem('activeDashboardSection', sectionId);
         }
 
-        // Function to load enquiries data
-        async function loadEnquiriesData() {
-            const tableBody = document.getElementById('enquiries-table-body');
-            tableBody.innerHTML = `
-                <tr>
-                    <td colspan="1" class="px-6 py-4 text-center text-sm text-gray-500">
-                        <div class="flex justify-center items-center">
-                            <svg class="animate-spin h-5 w-5 mr-3 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            Loading enquiries...
-                        </div>
-                    </td>
-                </tr>
-            `;
-            
-            const enquiries = await fetchEnquiries();
-            displayEnquiries(enquiries);
-        }
-        // Function to load users data
-        async function loadUsersData() {
-            const tableBody = document.getElementById('users-table-body');
-            tableBody.innerHTML = `
-                <tr>
-                    <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">
-                        <div class="flex justify-center items-center">
-                            <svg class="animate-spin h-5 w-5 mr-3 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            Loading users...
-                        </div>
-                    </td>
-                </tr>
-            `;
-            
-            const users = await fetchUsers();
-            displayUsers(users);
-        }
         // Initialize the dashboard
         function initDashboard() {
             // Set up navigation click handlers
@@ -521,29 +562,24 @@
                     const section = link.getAttribute('data-section');
                     showSection(section);
                     
-                    // If enquiries section is selected, load the data
+                    // Load data for the selected section
                     if (section === 'enquiries') {
                         loadEnquiriesData();
-                    }                    // If users section is selected, load the data
-                    else if (section === 'users') {
+                    } else if (section === 'users') {
                         loadUsersData();
-                    }                    // You can add similar conditions for other sections when they're implemented
+                    }
                 });
-            });            
-            // Set up user details modal close button
-            document.getElementById('close-user-modal').addEventListener('click', () => {
-                document.getElementById('user-details-modal').classList.add('hidden');
             });
             
-            // Close modal when clicking outside the content
-            document.getElementById('user-details-modal').addEventListener('click', (e) => {
-                if (e.target === document.getElementById('user-details-modal')) {
-                    document.getElementById('user-details-modal').classList.add('hidden');
-                }
-            });            
-            // Show enquiries section by default and load its data
-            showSection('enquiries');
+            // Show default section
+            const defaultSection = 'enquiries';
+            showSection(defaultSection);
             loadEnquiriesData();
+            
+            // Set up modal close button
+            document.getElementById('close-user-modal').addEventListener('click', () => {
+                document.getElementById('user-modal').classList.add('hidden');
+            });
         }
 
         // Initialize the dashboard when the DOM is loaded

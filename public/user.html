@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Details</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans min-h-screen flex items-center justify-center p-4">
+    <div class="container mx-auto max-w-2xl">
+        <div class="bg-white shadow-xl rounded-xl p-8 fade-in">
+            <div class="flex items-center justify-between mb-6">
+                <h1 class="text-2xl font-bold text-gray-800">User Details</h1>
+                <a href="/index.html" id="back-link" class="text-blue-600 hover:text-blue-800 transition-colors duration-200 flex items-center">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    Back to Dashboard
+                </a>
+            </div>
+            <form id="user-form" class="space-y-6" aria-live="polite">
+                <!-- User fields will be populated here -->
+            </form>
+            <div class="mt-8 flex items-center space-x-4">
+                <button id="save-btn" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    Save Changes
+                </button>
+                <button id="cancel-btn" class="bg-gray-200 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-300 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors duration-200">
+                    Cancel
+                </button>
+                <span id="status-msg" class="text-sm text-gray-600" role="status"></span>
+            </div>
+        </div>
+    </div>
+    <script>
+        function getQueryParam(name) {
+            const url = new URL(window.location.href);
+            return url.searchParams.get(name);
+        }
+
+        const userId = getQueryParam('id');
+        const form = document.getElementById('user-form');
+        const saveBtn = document.getElementById('save-btn');
+        const cancelBtn = document.getElementById('cancel-btn');
+        const backLink = document.getElementById('back-link');
+        const statusMsg = document.getElementById('status-msg');
+        let userData = {};
+        let originalData = {};
+
+        async function fetchUser() {
+            if (!userId) {
+                showStatus('No user ID provided.', 'error');
+                saveBtn.disabled = true;
+                return;
+            }
+            showStatus('Loading user...');
+            try {
+                const res = await fetch(`/api/users/${userId}`);
+                if (!res.ok) throw new Error('Failed to fetch user');
+                userData = await res.json();
+                originalData = { ...userData };
+                renderForm(userData);
+                saveBtn.disabled = false;
+                showStatus('');
+            } catch (err) {
+                showStatus('Error loading user.', 'error');
+                saveBtn.disabled = true;
+            }
+        }
+
+        function renderForm(user) {
+            form.innerHTML = '';
+            Object.keys(user).forEach(key => {
+                const isReadOnly = (key === 'id' || key === 'created_at');
+                const wrapper = document.createElement('div');
+                wrapper.className = 'space-y-2';
+                
+                const label = document.createElement('label');
+                label.className = 'block text-sm font-medium text-gray-700';
+                label.textContent = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                label.htmlFor = `input-${key}`;
+
+                const input = document.createElement('input');
+                input.id = `input-${key}`;
+                input.name = key;
+                input.className = `mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm ${isReadOnly ? 'bg-gray-100' : ''}`;
+                input.value = user[key] ?? '';
+                input.readOnly = isReadOnly;
+                input.setAttribute('aria-describedby', `error-${key}`);
+
+                if (typeof user[key] === 'boolean') {
+                    input.type = 'checkbox';
+                    input.checked = !!user[key];
+                    input.className += ' h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded';
+                    input.addEventListener('change', (e) => {
+                        userData[key] = e.target.checked;
+                        updateSaveButton();
+                    });
+                } else {
+                    input.type = getInputType(key);
+                    input.addEventListener('input', (e) => {
+                        userData[key] = e.target.value;
+                        updateSaveButton();
+                    });
+                }
+
+                const errorSpan = document.createElement('span');
+                errorSpan.id = `error-${key}`;
+                errorSpan.className = 'text-red-500 text-sm hidden';
+
+                wrapper.appendChild(label);
+                wrapper.appendChild(input);
+                wrapper.appendChild(errorSpan);
+                form.appendChild(wrapper);
+            });
+        }
+
+        function getInputType(key) {
+            if (key.includes('email')) return 'email';
+            if (key.includes('phone')) return 'tel';
+            if (key.includes('age') || key.includes('count')) return 'number';
+            return 'text';
+        }
+
+        function showStatus(message, type = 'info') {
+            statusMsg.textContent = message;
+            statusMsg.className = `text-sm ${type === 'error' ? 'text-red-500' : type === 'success' ? 'text-green-500' : 'text-gray-600'}`;
+        }
+
+        function updateSaveButton() {
+            const hasChanges = Object.keys(userData).some(key => userData[key] !== originalData[key]);
+            saveBtn.disabled = !hasChanges;
+        }
+
+        saveBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            if (validateForm()) {
+                showStatus('Saving...');
+                saveBtn.disabled = true;
+                const updateData = {};
+                Object.keys(userData).forEach(key => {
+                    if (key !== 'id' && key !== 'created_at') {
+                        updateData[key] = userData[key];
+                    }
+                });
+                try {
+                    const res = await fetch(`/api/users/${userId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(updateData)
+                    });
+                    if (!res.ok) throw new Error('Failed to update user');
+                    originalData = { ...userData };
+                    showStatus('Saved successfully!', 'success');
+                    saveBtn.disabled = true;
+                } catch (err) {
+                    showStatus('Error saving user.', 'error');
+                } finally {
+                    saveBtn.disabled = false;
+                }
+            }
+        });
+
+        cancelBtn.addEventListener('click', () => {
+            userData = { ...originalData };
+            renderForm(userData);
+            showStatus('Changes discarded.');
+            saveBtn.disabled = true;
+        });
+
+        backLink.addEventListener('click', (e) => {
+            if (Object.keys(userData).some(key => userData[key] !== originalData[key])) {
+                e.preventDefault();
+                if (confirm('You have unsaved changes. Are you sure you want to leave?')) {
+                    window.location.href = backLink.href;
+                }
+            }
+        });
+
+        function validateForm() {
+            let isValid = true;
+            Object.keys(userData).forEach(key => {
+                const errorSpan = document.getElementById(`error-${key}`);
+                if (key.includes('email') && userData[key] && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userData[key])) {
+                    errorSpan.textContent = 'Please enter a valid email address';
+                    errorSpan.classList.remove('hidden');
+                    isValid = false;
+                } else {
+                    errorSpan.classList.add('hidden');
+                }
+            });
+            return isValid;
+        }
+
+        fetchUser();
+    </script>
+</body>
+</html>
