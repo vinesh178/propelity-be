@@ -1,4 +1,4 @@
-import { getAllEnquiries, debugSupabaseConnection } from './enquiries';
+import { getAllEnquiries } from './enquiries';
 import { supabase } from './supabase/supabaseClient';
 
 // Function to test direct query to the database
@@ -67,8 +67,8 @@ async function runTests() {
   try {
     // First, debug the Supabase connection
     console.log('\n=== Testing Supabase Connection ===');
-    const debugResult = await debugSupabaseConnection();
-    console.log('Debug result:', debugResult);
+
+
     
     // Check if the table exists
     const tableCheck = await checkTableExists();
