@@ -32,28 +32,54 @@ export async function notifySlackAboutEnquiry(enquiryId: string): Promise<boolea
   console.log(`Fetching enquiry with ID ${enquiryId} for Slack notification...`);
   
   try {
-    // Fetch the enquiry with user data
-    const { data, error } = await supabase
+    // Fetch the enquiry with user data using the correct table name
+    const { data: enquiryData, error: enquiryError } = await supabase
       .from('enquiries')
-      .select(`
-        *,
-        user:propelity_users(*)
-      `)
+      .select('*')
       .eq('id', enquiryId)
       .single();
     
-    if (error) {
-      console.error(`Error fetching enquiry with ID ${enquiryId}:`, error);
+    if (enquiryError) {
+      console.error(`Error fetching enquiry with ID ${enquiryId}:`, enquiryError);
       return false;
     }
     
-    if (!data) {
+    if (!enquiryData) {
       console.error(`No enquiry found with ID ${enquiryId}`);
       return false;
     }
     
+    console.log(`Found enquiry data:`, JSON.stringify(enquiryData, null, 2));
+    
+    // If there's a user_id, fetch the user separately
+    let userData = null;
+    if (enquiryData.user_id) {
+      console.log(`Fetching user data for user ID: ${enquiryData.user_id}`);
+      const { data: user, error: userError } = await supabase
+        .from('propelity_users') // Using the correct table name 'propelity_users'
+        .select('*')
+        .eq('id', enquiryData.user_id)
+        .single();
+      
+      if (userError) {
+        console.warn(`Error fetching user with ID ${enquiryData.user_id}:`, userError);
+        // Continue without user data
+      } else {
+        userData = user;
+        console.log(`Found user data:`, JSON.stringify(userData, null, 2));
+      }
+    } else {
+      console.log(`No user_id found in enquiry data`);
+    }
+    
+    // Combine the data
+    const combinedData: EnquiryWithUser = {
+      ...enquiryData,
+      user: userData
+    };
+    
     // Send notification to Slack
-    const notificationSent = await sendEnquiryNotificationToSlack(data as EnquiryWithUser);
+    const notificationSent = await sendEnquiryNotificationToSlack(combinedData);
     
     if (notificationSent) {
       console.log('Slack notification sent successfully');

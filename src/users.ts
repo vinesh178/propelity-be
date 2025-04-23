@@ -208,5 +208,5 @@ export async function debugUsersConnection() {
   }
 }
 
-// Call the debug function to test the connection
-debugUsersConnection();
+// Uncomment to debug connection issues
+// debugUsersConnection();

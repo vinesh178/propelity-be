@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import path from 'path';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 
 // Load environment variables at the very beginning
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
@@ -8,6 +9,7 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 // Import after environment variables are loaded
 import { getAllEnquiries } from './enquiries';
 import { fetchUsers, fetchUserById, updateUser } from './users';
+import { handleNewEnquiryNotification } from './notifications/enquiryNotifications';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -111,7 +113,74 @@ app.put('/api/users/:id', async (req: Request, res: Response) => {
     return res.status(500).json({ message: 'Internal server error', error: err instanceof Error ? err.message : String(err) });
   }
 });
+// Test endpoint for webhook verification
+app.get('/api/webhooks/supabase/test', (req: Request, res: Response) => {
+  console.log('Webhook test endpoint accessed');
+  return res.status(200).json({ 
+    message: 'Webhook test endpoint is working', 
+    timestamp: new Date().toISOString(),
+    url: 'https://select-pet-corgi.ngrok-free.app/api/webhooks/supabase'
+  });
+});
 
+// Webhook endpoint for Supabase database changes
+app.post('/api/webhooks/supabase', express.json(), async (req: Request, res: Response) => {
+  console.log('Received webhook from Supabase:', JSON.stringify(req.body, null, 2));
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  
+  try {
+    // Process the webhook payload
+    // Supabase sends data in a specific format, we need to extract the relevant information
+    const payload = req.body;
+    
+    // Check if this is a valid payload with the expected structure
+    if (!payload) {
+      console.warn('Empty webhook payload');
+      return res.status(400).json({ message: 'Empty payload' });
+    }
+    
+    // Handle different payload formats
+    // Supabase might send the data in different formats depending on the webhook configuration
+    let type, table, record;
+    
+    if (payload.type && payload.table && payload.record) {
+      // Standard format
+      type = payload.type;
+      table = payload.table;
+      record = payload.record;
+    } else if (payload.event && payload.schema && payload.table && payload.record) {
+      // Alternative format
+      type = payload.event;
+      table = payload.table;
+      record = payload.record;
+    } else {
+      // Try to handle any other format
+      console.warn('Unknown webhook payload format:', payload);
+      // Just accept it and return success to avoid webhook retries
+      return res.status(200).json({ message: 'Webhook received (unknown format)' });
+    }
+    
+    console.log(`Processed webhook: type=${type}, table=${table}, record ID=${record?.id || 'unknown'}`);
+    
+    // Check if this is an insert event for the enquiries table
+    if ((type === 'INSERT' || type === 'insert') && table === 'enquiries' && record && record.id) {
+      console.log('New enquiry detected:', record.id);
+      
+      // Trigger the notification
+      await handleNewEnquiryNotification(record.id);
+      console.log('Notification triggered for new enquiry:', record.id);
+    } else {
+      console.log(`Ignoring webhook event: type=${type}, table=${table}`);
+    }
+    
+    // Always return a 200 response quickly to acknowledge receipt
+    return res.status(200).json({ message: 'Webhook received and processed' });
+  } catch (error) {
+    console.error('Error processing webhook:', error);
+    // Still return 200 to prevent Supabase from retrying
+    return res.status(200).json({ message: 'Webhook received with errors' });
+  }
+});
 app.get('/', (req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
@@ -120,4 +189,6 @@ app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`Supabase URL configured: ${process.env.SUPABASE_URL ? 'Yes' : 'No'}`);
+  console.log(`Local webhook endpoint: http://localhost:${port}/api/webhooks/supabase`);
+  console.log(`Public webhook URL: https://select-pet-corgi.ngrok-free.app/api/webhooks/supabase`);
 });
