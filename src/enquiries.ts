@@ -1,6 +1,7 @@
 import { supabase } from './supabase/supabaseClient';
+import { handleNewEnquiryNotification } from './notifications/enquiryNotifications';
 
-interface Enquiry {
+export interface Enquiry {
   // Define the structure of your enquiry object based on your table columns
   id: string;
   first_name: string;
@@ -93,6 +94,16 @@ export async function createEnquiry(enquiry: Omit<Enquiry, 'id' | 'created_at'>)
     }
 
     console.log('Successfully created enquiry in Supabase');
+    
+    // Trigger Slack notification without affecting the main function flow
+    if (data && data.id) {
+      // Use setTimeout to make this non-blocking
+      setTimeout(() => {
+        handleNewEnquiryNotification(data.id)
+          .catch(err => console.error('Error in notification handler:', err));
+      }, 0);
+    }
+    
     return { data: data as Enquiry, error: null };
   }
   catch (err) {
@@ -136,6 +147,28 @@ export async function debugSupabaseConnection() {
   }
   
   try {
+    // Get table information to see the actual columns
+    console.log('Fetching table information for enquiries table...');
+    const { data: tableInfo, error: tableError } = await supabase.rpc('get_table_info', { table_name: 'enquiries' });
+    
+    if (tableError) {
+      console.error('Error fetching table information:', tableError);
+      
+      // Alternative approach: try to get the table definition directly
+      console.log('Trying alternative approach to get table structure...');
+      const { data: tables, error: tablesError } = await supabase.from('information_schema.columns')
+        .select('column_name, data_type')
+        .eq('table_name', 'enquiries');
+        
+      if (tablesError) {
+        console.error('Error fetching table structure:', tablesError);
+      } else if (tables) {
+        console.log('Table structure from information_schema:', tables);
+      }
+    } else {
+      console.log('Table information:', tableInfo);
+    }
+    
     // Test connection by fetching a simple count
     const { count, error: countError } = await supabase
       .from('enquiries')
@@ -147,6 +180,18 @@ export async function debugSupabaseConnection() {
     }
     
     console.log(`Connection successful. Found ${count} records in enquiries table.`);
+    
+    // List all tables in the public schema to verify the table exists
+    const { data: tablesList, error: tablesListError } = await supabase
+      .from('information_schema.tables')
+      .select('table_name')
+      .eq('table_schema', 'public');
+      
+    if (tablesListError) {
+      console.error('Error listing tables:', tablesListError);
+    } else {
+      console.log('Available tables in public schema:', tablesList);
+    }
     
     // Fetch a sample record to verify data structure
     const { data, error } = await supabase
