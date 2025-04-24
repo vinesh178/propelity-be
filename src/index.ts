@@ -10,6 +10,7 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 import { getAllEnquiries } from './enquiries';
 import { fetchUsers, fetchUserById, updateUser } from './users';
 import { handleNewEnquiryNotification } from './notifications/enquiryNotifications';
+import { sendEnquiryNotificationToSlack } from './notifications/slackWebhook';
 import { authenticateUser, verifyToken, signOutUser } from './auth';
 
 const app = express();
@@ -120,7 +121,7 @@ app.get('/api/webhooks/supabase/test', (req: Request, res: Response) => {
   return res.status(200).json({ 
     message: 'Webhook test endpoint is working', 
     timestamp: new Date().toISOString(),
-    url: 'https://select-pet-corgi.ngrok-free.app/api/webhooks/supabase'
+    url: 'https://admin.propelity.com.au/api/webhooks/supabase'
   });
 });
 
@@ -128,57 +129,75 @@ app.get('/api/webhooks/supabase/test', (req: Request, res: Response) => {
 app.post('/api/webhooks/supabase', express.json(), async (req: Request, res: Response) => {
   console.log('Received webhook from Supabase:', JSON.stringify(req.body, null, 2));
   console.log('Headers:', JSON.stringify(req.headers, null, 2));
-  
+
   try {
     // Process the webhook payload
-    // Supabase sends data in a specific format, we need to extract the relevant information
     const payload = req.body;
-    
-    // Check if this is a valid payload with the expected structure
+
     if (!payload) {
       console.warn('Empty webhook payload');
       return res.status(400).json({ message: 'Empty payload' });
     }
-    
-    // Handle different payload formats
-    // Supabase might send the data in different formats depending on the webhook configuration
+
     let type, table, record;
-    
+
     if (payload.type && payload.table && payload.record) {
-      // Standard format
       type = payload.type;
       table = payload.table;
       record = payload.record;
     } else if (payload.event && payload.schema && payload.table && payload.record) {
-      // Alternative format
       type = payload.event;
       table = payload.table;
       record = payload.record;
     } else {
-      // Try to handle any other format
       console.warn('Unknown webhook payload format:', payload);
-      // Just accept it and return success to avoid webhook retries
+      // Try direct Slack notification for unknown formats if record exists
+      if (payload.record) {
+        console.log('Attempting direct Slack notification for unknown format. Record:', payload.record);
+        try {
+          await sendEnquiryNotificationToSlack(payload.record);
+          console.log('Direct Slack notification sent for unknown format.');
+        } catch (notifyErr) {
+          console.error('Error sending direct Slack notification for unknown format:', notifyErr);
+        }
+      }
       return res.status(200).json({ message: 'Webhook received (unknown format)' });
     }
-    
+
     console.log(`Processed webhook: type=${type}, table=${table}, record ID=${record?.id || 'unknown'}`);
-    
-    // Check if this is an insert event for the enquiries table
+
+    // Add logging before notification
     if ((type === 'INSERT' || type === 'insert') && table === 'enquiries' && record && record.id) {
       console.log('New enquiry detected:', record.id);
-      
-      // Trigger the notification
-      await handleNewEnquiryNotification(record.id);
-      console.log('Notification triggered for new enquiry:', record.id);
+      try {
+        await handleNewEnquiryNotification(record.id);
+        console.log('Notification triggered for new enquiry:', record.id);
+      } catch (notifyErr) {
+        console.error('Error in handleNewEnquiryNotification:', notifyErr);
+        // Try direct Slack notification as fallback
+        try {
+          await sendEnquiryNotificationToSlack(record);
+          console.log('Fallback: Direct Slack notification sent.');
+        } catch (slackErr) {
+          console.error('Fallback: Error sending direct Slack notification:', slackErr);
+        }
+      }
+    } else if (record) {
+      // If not a standard insert event, still attempt direct Slack notification
+      console.log('Non-standard event, attempting direct Slack notification. Record:', record);
+      try {
+        await sendEnquiryNotificationToSlack(record);
+        console.log('Direct Slack notification sent for non-standard event.');
+      } catch (slackErr) {
+        console.error('Error sending direct Slack notification for non-standard event:', slackErr);
+      }
     } else {
       console.log(`Ignoring webhook event: type=${type}, table=${table}`);
     }
-    
-    // Always return a 200 response quickly to acknowledge receipt
+
     return res.status(200).json({ message: 'Webhook received and processed' });
   } catch (error) {
     console.error('Error processing webhook:', error);
-    // Still return 200 to prevent Supabase from retrying
     return res.status(200).json({ message: 'Webhook received with errors' });
   }
 });
@@ -269,5 +288,5 @@ app.listen(port, () => {
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`Supabase URL configured: ${process.env.SUPABASE_URL ? 'Yes' : 'No'}`);
   console.log(`Local webhook endpoint: http://localhost:${port}/api/webhooks/supabase`);
-  console.log(`Public webhook URL: https://select-pet-corgi.ngrok-free.app/api/webhooks/supabase`);
+  console.log(`Public webhook URL: https://admin.propelity.com.au/api/webhooks/supabase`);
 });

@@ -9,7 +9,7 @@ This guide explains how to set up a Supabase webhook to notify your application 
 The webhook URL for your application is:
 
 ```
-https://select-pet-corgi.ngrok-free.app/api/webhooks/supabase
+https://admin.propelity.com.au/api/webhooks/supabase
 ```
 
 ## Setting up the Webhook in Supabase
@@ -25,7 +25,7 @@ https://select-pet-corgi.ngrok-free.app/api/webhooks/supabase
 - **Name**: `enquiries-webhook` (or any descriptive name)
 - **Table**: `enquiries`
 - **Events**: Select `INSERT` (to trigger when new enquiries are created)
-- **URL**: `https://select-pet-corgi.ngrok-free.app/api/webhooks/supabase`
+- **URL**: `https://admin.propelity.com.au/api/webhooks/supabase`
 
 ### Advanced Configuration
 
@@ -50,7 +50,7 @@ For the payload format, you can use the default format or customize it. The appl
 You can test if your webhook endpoint is accessible by visiting:
 
 ```
-https://select-pet-corgi.ngrok-free.app/api/webhooks/supabase/test
+https://admin.propelity.com.au/api/webhooks/supabase/test
 ```
 
 This should return a JSON response confirming the webhook endpoint is working.
