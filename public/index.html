@@ -7,7 +7,14 @@
     <link href="/styles.css" rel="stylesheet">
 </head>
 <body class="bg-gray-100 font-sans">
-    <div class="flex min-h-screen">
+    <div id="auth-check" class="fixed inset-0 bg-white z-50 flex items-center justify-center">
+        <div class="text-center">
+            <div class="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600 mb-4"></div>
+            <p class="text-gray-600">Checking authentication...</p>
+        </div>
+    </div>
+
+    <div id="dashboard-content" class="hidden flex min-h-screen">
         <!-- Sidebar Navigation -->
         <aside class="w-64 bg-white shadow-md">
             <div class="p-6 border-b border-gray-200">
@@ -49,7 +56,15 @@
             <header class="bg-white shadow-sm px-6 py-4">
                 <div class="flex justify-between items-center">
                     <h1 class="text-xl font-semibold text-gray-800">Dashboard</h1>
-                    <div class="text-sm text-gray-600">Admin Panel</div>
+                    <div class="flex items-center">
+                        <div class="text-sm text-gray-600 mr-4">Admin Panel</div>
+                        <button onclick="logout()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-1 px-3 rounded text-sm flex items-center transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                            </svg>
+                            Logout
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -132,6 +147,70 @@
     </div>
 
     <script>
+        // Authentication check
+        document.addEventListener('DOMContentLoaded', function() {
+            const authCheck = document.getElementById('auth-check');
+            const dashboardContent = document.getElementById('dashboard-content');
+            const token = localStorage.getItem('supabase.auth.token');
+            
+            // If no token exists, redirect to login page
+            if (!token) {
+                console.log('No authentication token found, redirecting to login');
+                window.location.href = '/login.html';
+                return;
+            }
+            
+            // Verify the token with the server
+            fetch('/api/auth/verify', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Token verification failed');
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Authentication successful:', data.user.email);
+                // Show the dashboard content
+                authCheck.classList.add('hidden');
+                dashboardContent.classList.remove('hidden');
+                // Initialize the dashboard
+                initDashboard();
+            })
+            .catch(error => {
+                console.error('Authentication error:', error);
+                // Clear invalid token
+                localStorage.removeItem('supabase.auth.token');
+                // Redirect to login page
+                window.location.href = '/login.html';
+            });
+        });
+
+        // Add logout functionality
+        function logout() {
+            fetch('/api/auth/logout', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token')}`
+                }
+            })
+            .then(() => {
+                // Clear token and redirect regardless of response
+                localStorage.removeItem('supabase.auth.token');
+                window.location.href = '/login.html';
+            })
+            .catch(error => {
+                console.error('Logout error:', error);
+                // Still clear token and redirect
+                localStorage.removeItem('supabase.auth.token');
+                window.location.href = '/login.html';
+            });
+        }
+
         // Function to fetch enquiries from the API
         async function fetchEnquiries() {
             try {
@@ -379,7 +458,7 @@
                 <tr>
                     <td colspan="10" class="px-6 py-4 text-center text-sm text-gray-500">
                         <div class="flex justify-center items-center">
-                            <svg class="animate-spin h-5 w-5 mr-3 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <svg class="animate-spin h-5 w-5 mr-3 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
@@ -404,7 +483,7 @@
                 <tr>
                     <td colspan="10" class="px-6 py-4 text-center text-sm text-gray-500">
                         <div class="flex justify-center items-center">
-                            <svg class="animate-spin h-5 w-5 mr-3 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <svg class="animate-spin h-5 w-5 mr-3 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>

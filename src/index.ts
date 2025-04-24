@@ -10,6 +10,7 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 import { getAllEnquiries } from './enquiries';
 import { fetchUsers, fetchUserById, updateUser } from './users';
 import { handleNewEnquiryNotification } from './notifications/enquiryNotifications';
+import { authenticateUser, verifyToken, signOutUser } from './auth';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -181,6 +182,84 @@ app.post('/api/webhooks/supabase', express.json(), async (req: Request, res: Res
     return res.status(200).json({ message: 'Webhook received with errors' });
   }
 });
+
+// Authentication routes
+app.post('/api/auth/login', async (req: Request, res: Response) => {
+  const { email, password } = req.body;
+  
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Email and password are required' });
+  }
+  
+  try {
+    const { data, error } = await authenticateUser(email, password);
+    
+    if (error) {
+      return res.status(401).json({ message: 'Authentication failed', error: error.message });
+    }
+    
+    // Return the session token
+    return res.status(200).json({
+      message: 'Authentication successful',
+      token: data.session?.access_token,
+      user: {
+        id: data.user?.id,
+        email: data.user?.email
+      }
+    });
+  } catch (err) {
+    console.error('Unexpected error during login:', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+app.get('/api/auth/verify', verifyToken, (req: Request, res: Response) => {
+  // If middleware passes, the token is valid
+  return res.status(200).json({ message: 'Token is valid', user: (req as any).user });
+});
+
+app.post('/api/auth/logout', async (req: Request, res: Response) => {
+  try {
+    const { success, error } = await signOutUser();
+    
+    if (!success) {
+      return res.status(500).json({ message: 'Logout failed', error: error?.message });
+    }
+    
+    return res.status(200).json({ message: 'Logged out successfully' });
+  } catch (err) {
+    console.error('Unexpected error during logout:', err);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Protected route example
+app.get('/api/admin/dashboard-data', verifyToken, async (req: Request, res: Response) => {
+  // This route is protected and only accessible with a valid token
+  // The verifyToken middleware ensures only admins can access this
+  
+  try {
+    // Example of fetching admin dashboard data
+    const [enquiriesResult, usersResult] = await Promise.all([
+      getAllEnquiries(),
+      fetchUsers()
+    ]);
+    
+    return res.status(200).json({
+      enquiries: enquiriesResult.data || [],
+      users: usersResult.data || [],
+      stats: {
+        totalEnquiries: enquiriesResult.data?.length || 0,
+        totalUsers: usersResult.data?.length || 0,
+        lastUpdated: new Date().toISOString()
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching admin dashboard data:', err);
+    return res.status(500).json({ message: 'Failed to fetch dashboard data' });
+  }
+});
+
 app.get('/', (req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
