@@ -24,6 +24,7 @@ type EnquiryData = {
   last_name?: string;
   email?: string;
   phone?: string;
+  state?: string;
   // Or might be in a nested user object
   user?: {
     first_name: string;
@@ -52,7 +53,8 @@ const formatEnquiryForSlack = (enquiry: EnquiryData): string => {
     `*Service Type:* ${enquiry.service_type}\n` +
     `*Budget Range:* ${enquiry.budget_range}\n` +
     `*Additional Info:* ${enquiry.additional_info || 'None provided'}\n` +
-    `*Submitted:* ${new Date(enquiry.created_at).toLocaleString()}\n`;
+    `*State:* ${enquiry.state || 'Not provided'}\n` +
+    `*Submitted:* ${new Date(enquiry.created_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney' })}\n`;
 };
 
 /**
