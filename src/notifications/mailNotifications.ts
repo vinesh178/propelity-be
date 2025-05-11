@@ -1,28 +1,28 @@
-import { supabase } from '../supabase/supabaseClient';
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import { loadTemplate, EnquiryReceivedTemplateData } from './templates/templateLoader';
 
 // Load environment variables
 dotenv.config();
 
-// Define interfaces based on the actual database schema for notification purposes only
-interface User {
+// Define a simple interface for enquiry data
+interface EnquiryData {
   id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  phone: string;
-}
-
-interface EnquiryWithUser {
-  id: string;
-  additional_info: string | null;
-  budget_range: string;
-  created_at: string;
-  user_id: string;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  phone?: string;
   service_type: string;
-  user?: User;
-  state?: string
+  budget_range: string;
+  additional_info?: string | null;
+  state?: string;
+  // For backward compatibility with existing code
+  user?: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+  };
 }
 
 /**
@@ -31,15 +31,20 @@ interface EnquiryWithUser {
  */
 function createZohoMailTransporter() {
   // Zoho Mail SMTP configuration
+  console.log('Creating mail transporter with:');
+  console.log(`Host: ${process.env.ZOHO_MAIL_HOST || 'smtp.zoho.com'}`);
+  console.log(`Port: ${process.env.ZOHO_MAIL_PORT || '465'}`);
+  console.log(`Secure: ${process.env.ZOHO_MAIL_SECURE !== 'false'}`);
+  console.log(`User: ${process.env.ZOHO_MAIL_USER}`);
+  
   return nodemailer.createTransport({
     host: process.env.ZOHO_MAIL_HOST || 'smtp.zoho.com',
-    port: parseInt(process.env.ZOHO_MAIL_PORT || '465'), // Changed default to 465 (SSL)
+    port: parseInt(process.env.ZOHO_MAIL_PORT || '465'),
     secure: process.env.ZOHO_MAIL_SECURE !== 'false', // Default to true for secure connection
     auth: {
       user: process.env.ZOHO_MAIL_USER, // Your Zoho email address
       pass: process.env.ZOHO_MAIL_PASSWORD, // Your Zoho email password or app-specific password
     },
-    // Add timeout options to prevent premature socket close
     connectionTimeout: 10000, // 10 seconds
     greetingTimeout: 10000, // 10 seconds
     socketTimeout: 30000, // 30 seconds
@@ -49,136 +54,94 @@ function createZohoMailTransporter() {
 }
 
 /**
- * Sends an email notification about a new enquiry
- * @param {EnquiryWithUser} enquiryData - The enquiry data with user information
+ * Sends a confirmation email to the user who submitted the enquiry
+ * @param {EnquiryData} enquiryData - The enquiry data
  * @returns {Promise<boolean>} True if the email was sent successfully, false otherwise
  */
-async function sendEnquiryNotificationByEmail(enquiryData: EnquiryWithUser): Promise<boolean> {
+async function sendUserConfirmationEmail(enquiryData: EnquiryData): Promise<boolean> {
   try {
+    // Get email from either the root object or nested user object
+    const email = enquiryData.email || enquiryData.user?.email;
+    const firstName = enquiryData.first_name || enquiryData.user?.first_name || 'Valued Customer';
+    
+    if (!email) {
+      console.warn('Cannot send confirmation email: No email address available');
+      return false;
+    }
+
     // Create a transporter using Zoho Mail configuration
     const transporter = createZohoMailTransporter();
 
-    // Format user information
-    const userName = enquiryData.user 
-      ? `${enquiryData.user.first_name} ${enquiryData.user.last_name}` 
-      : 'Unknown User';
-    
-    const userEmail = enquiryData.user?.email || 'Not provided';
-    const userPhone = enquiryData.user?.phone || 'Not provided';
+    // Prepare template data
+    const templateData: EnquiryReceivedTemplateData = {
+      firstName: firstName,
+      serviceType: enquiryData.service_type,
+      budgetRange: enquiryData.budget_range,
+      additionalInfo: enquiryData.additional_info || 'None provided'
+    };
 
-    // Format the email content
-    const emailContent = `
-      <h1>New Enquiry Received</h1>
-      <p><strong>Enquiry ID:</strong> ${enquiryData.id}</p>
-      <p><strong>Service Type:</strong> ${enquiryData.service_type}</p>
-      <p><strong>Budget Range:</strong> ${enquiryData.budget_range}</p>
-      <p><strong>State:</strong> ${enquiryData.state || 'Not provided'}</p>       
-      <p><strong>Additional Information:</strong> ${enquiryData.additional_info || 'None provided'}</p>
-      <h2>User Information</h2>
-      <p><strong>Name:</strong> ${userName}</p>
-      <p><strong>Email:</strong> ${userEmail}</p>
-      <p><strong>Phone:</strong> ${userPhone}</p>
-    `;
+    // Load and process the template
+    const emailContent = loadTemplate('enquiryReceived', templateData);
 
     // Send the email
     const info = await transporter.sendMail({
-      from: process.env.ZOHO_MAIL_FROM || process.env.ZOHO_MAIL_USER, // Use the configured sender or fall back to the auth user
-      to: 'vineshkkmr@gmail.com',
-      subject: 'New enquiry',
+      from: `"Propelity" <${process.env.ZOHO_MAIL_FROM || process.env.ZOHO_MAIL_USER}>`,
+      to: email,
+      subject: 'Your Enquiry Has Been Received',
       html: emailContent,
+      headers: {
+        'X-Entity-Ref-ID': enquiryData.id, // Helps with email threading and tracking
+        'List-Unsubscribe': '<mailto:unsubscribe@propelity.com.au>', // Good practice for deliverability
+      },
+      priority: 'high', // Mark as important
+      replyTo: 'support@propelity.com.au', // Provide a proper reply-to address
     });
 
-    console.log(`Email sent successfully: ${info.messageId}`);
+    console.log(`User confirmation email sent successfully: ${info.messageId}`);
     return true;
   } catch (error: any) {
-    console.error('Error sending email notification:', error);
+    console.error('Error sending user confirmation email:', error);
     return false;
   }
 }
 
 /**
- * Fetches an enquiry with its associated user data and sends an email notification
- * @param {string} enquiryId - The ID of the enquiry to fetch and notify about
+ * Sends a confirmation email to the user who submitted the enquiry
+ * @param {EnquiryData} enquiryData - The enquiry data
  * @returns {Promise<boolean>} True if the notification was sent successfully, false otherwise
  */
-export async function notifyEmailAboutEnquiry(enquiryId: string): Promise<boolean> {
-  console.log(`Fetching enquiry with ID ${enquiryId} for email notification...`);
+export async function notifyUserAboutEnquiry(enquiryData: EnquiryData): Promise<boolean> {
+  console.log('Sending confirmation email to user...');
   
   try {
-    // Fetch the enquiry with user data using the correct table name
-    const { data: enquiryData, error: enquiryError } = await supabase
-      .from('enquiries')
-      .select('*')
-      .eq('id', enquiryId)
-      .single();
-    
-    if (enquiryError) {
-      console.error(`Error fetching enquiry with ID ${enquiryId}:`, enquiryError);
-      return false;
-    }
-    
-    if (!enquiryData) {
-      console.error(`No enquiry found with ID ${enquiryId}`);
-      return false;
-    }
-    
-    console.log(`Found enquiry data:`, JSON.stringify(enquiryData, null, 2));
-    
-    // If there's a user_id, fetch the user separately
-    let userData = null;
-    if (enquiryData.user_id) {
-      console.log(`Fetching user data for user ID: ${enquiryData.user_id}`);
-      const { data: user, error: userError } = await supabase
-        .from('propelity_users') // Using the correct table name 'propelity_users'
-        .select('*')
-        .eq('id', enquiryData.user_id)
-        .single();
-      
-      if (userError) {
-        console.warn(`Error fetching user with ID ${enquiryData.user_id}:`, userError);
-        // Continue without user data
-      } else {
-        userData = user;
-        console.log(`Found user data:`, JSON.stringify(userData, null, 2));
-      }
-    } else {
-      console.log(`No user_id found in enquiry data`);
-    }
-    
-    // Combine the data
-    const combinedData: EnquiryWithUser = {
-      ...enquiryData,
-      user: userData
-    };
-    
-    // Send notification by email
-    const notificationSent = await sendEnquiryNotificationByEmail(combinedData);
+    // Send confirmation email directly using the provided enquiry data
+    const notificationSent = await sendUserConfirmationEmail(enquiryData);
     
     if (notificationSent) {
-      console.log('Email notification sent successfully');
+      console.log('User confirmation email sent successfully');
       return true;
     } else {
-      console.warn('Failed to send email notification');
+      console.warn('Failed to send user confirmation email');
       return false;
     }
   } catch (err: any) {
-    console.error('Exception when sending email notification:', err);
+    console.error('Exception when sending user confirmation email:', err);
     return false;
   }
 }
 
 /**
- * Listens for new enquiries and sends email notifications
- * This function can be called after a new enquiry is created
- * @param {string} enquiryId - The ID of the newly created enquiry
+ * Handles sending a confirmation email for a new enquiry
+ * This function can be called directly with enquiry data
+ * @param {EnquiryData} enquiryData - The enquiry data
  */
-export async function handleNewEnquiryEmailNotification(enquiryId: string): Promise<void> {
+export async function handleNewEnquiryEmailNotification(enquiryData: EnquiryData): Promise<void> {
   try {
-    const success = await notifyEmailAboutEnquiry(enquiryId);
+    const success = await notifyUserAboutEnquiry(enquiryData);
     if (success) {
-      console.log(`Successfully sent email notification about enquiry ${enquiryId}`);
+      console.log(`Successfully sent user confirmation email for enquiry ${enquiryData.id}`);
     } else {
-      console.error(`Failed to send email notification about enquiry ${enquiryId}`);
+      console.error(`Failed to send user confirmation email for enquiry ${enquiryData.id}`);
     }
   } catch (error: any) {
     console.error('Error in handleNewEnquiryEmailNotification:', error);

@@ -28,14 +28,23 @@ async function testEmailNotification() {
   }
   
   try {
-    // If you have a specific enquiry ID you want to test with, replace this with that ID
-    // Otherwise, this will attempt to use a test ID which may not exist in your database
-    const testEnquiryId = process.env.TEST_ENQUIRY_ID || 'test-enquiry-id';
+    // Create a test enquiry object
+    const testEnquiry = {
+      id: 'test-enquiry-id',
+      first_name: 'Test',
+      last_name: 'User',
+      email: process.env.TEST_EMAIL || 'test@example.com',
+      phone: '0400123456',
+      service_type: 'Website Development',
+      budget_range: '$5,000 - $10,000',
+      additional_info: 'This is a test enquiry',
+      state: 'NSW'
+    };
     
-    console.log(`Testing email notification with enquiry ID: ${testEnquiryId}`);
+    console.log(`Testing email notification with test enquiry data`);
     
-    // Call the notification handler
-    await handleNewEnquiryEmailNotification(testEnquiryId);
+    // Call the notification handler with the test enquiry
+    await handleNewEnquiryEmailNotification(testEnquiry);
     
     console.log('Test completed. Check the console output above for results.');
   } catch (error) {
