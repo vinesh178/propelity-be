@@ -72,10 +72,26 @@ async function sendUserConfirmationEmail(enquiryData: EnquiryData): Promise<bool
     // Create a transporter using Zoho Mail configuration
     const transporter = createZohoMailTransporter();
 
-    // Prepare template data
+    // Prepare template data with formatted service type
+    let formattedServiceType = enquiryData.service_type;
+    
+    // Convert service_type to human-readable format
+    switch(enquiryData.service_type) {
+      case 'both':
+        formattedServiceType = 'Buyer Agent and Mortgage Broker Services';
+        break;
+      case 'buyer_agent':
+        formattedServiceType = 'Buyer Agent Services';
+        break;
+      case 'mortgage_broker':
+        formattedServiceType = 'Mortgage Broker Services';
+        break;
+      // Default case will use the original service_type value
+    }
+    
     const templateData: EnquiryReceivedTemplateData = {
       firstName: firstName,
-      serviceType: enquiryData.service_type,
+      serviceType: formattedServiceType,
       budgetRange: enquiryData.budget_range,
       additionalInfo: enquiryData.additional_info || 'None provided'
     };
@@ -94,7 +110,7 @@ async function sendUserConfirmationEmail(enquiryData: EnquiryData): Promise<bool
         'List-Unsubscribe': '<mailto:unsubscribe@propelity.com.au>', // Good practice for deliverability
       },
       priority: 'high', // Mark as important
-      replyTo: 'support@propelity.com.au', // Provide a proper reply-to address
+      replyTo: 'admin@propelity.com.au', // Provide a proper reply-to address
     });
 
     console.log(`User confirmation email sent successfully: ${info.messageId}`);

@@ -14,11 +14,11 @@ async function customEmailTest() {
     // Create a custom enquiry object with your test data
     const customEnquiry = {
       id: 'custom-test-id',
-      first_name: 'John',
-      last_name: 'Doe',
-      email: process.env.TEST_EMAIL || 'vineshk83@gmail.com', // Replace with your email or use TEST_EMAIL env var
+      first_name: 'Vinesh',
+      last_name: 'Kumar',
+      email: 'vineshk83@gmail.com', // Replace with your email or use TEST_EMAIL env var
       phone: '0412345678',
-      service_type: 'Web Development',
+      service_type: 'buyer_agent',
       budget_range: '$10,000 - $20,000',
       additional_info: 'I need a responsive website for my business',
       state: 'VIC'
