@@ -7,31 +7,39 @@ dotenv.config();
 async function testDirectSMTP() {
   console.log('Starting direct SMTP test...');
   console.log('Using configuration:');
-  console.log(`Host: ${process.env.ZOHO_MAIL_HOST || 'smtp.zoho.com'}`);
+  console.log(`Host: ${process.env.ZOHO_MAIL_HOST || 'smtp.zoho.com.au'}`);
   console.log(`Port: ${process.env.ZOHO_MAIL_PORT || '465'}`);
   console.log(`Secure: ${process.env.ZOHO_MAIL_SECURE !== 'false'}`);
   console.log(`User: ${process.env.ZOHO_MAIL_USER}`);
+  console.log(`Test Recipient: ${process.env.SEND_TEST_MAIL_TO || 'not set - using default'}`);
   
   try {
     // Create a transporter
     const transporter = nodemailer.createTransport({
-      host: process.env.ZOHO_MAIL_HOST || 'smtp.zoho.com',
+      host: process.env.ZOHO_MAIL_HOST || 'smtp.zoho.com.au',
       port: parseInt(process.env.ZOHO_MAIL_PORT || '465'),
       secure: process.env.ZOHO_MAIL_SECURE !== 'false',
       auth: {
         user: process.env.ZOHO_MAIL_USER,
         pass: process.env.ZOHO_MAIL_PASSWORD,
       },
+      connectionTimeout: parseInt(process.env.SMTP_CONNECTION_TIMEOUT || '10000'),
+      greetingTimeout: parseInt(process.env.SMTP_GREETING_TIMEOUT || '10000'),
+      socketTimeout: parseInt(process.env.SMTP_SOCKET_TIMEOUT || '30000'),
       debug: true,
-      logger: true
+      logger: true,
+      tls: {
+        // Do not fail on invalid certs
+        rejectUnauthorized: false
+      }
     });
     
     // Verify connection
     await transporter.verify();
     console.log('SMTP connection verified!');
     
-    // Test recipient email
-    const testEmail = process.env.TEST_EMAIL || 'vineshk83@gmail.com';
+    // Test recipient email - use SEND_TEST_MAIL_TO if available
+    const testEmail = process.env.SEND_TEST_MAIL_TO || process.env.TEST_EMAIL || 'admin@propelity.com.au';
     console.log(`Sending test email to: ${testEmail}`);
     
     // Send a simple email

@@ -12,6 +12,7 @@ async function testEmailFromDocker() {
   console.log(`ZOHO_MAIL_USER: ${process.env.ZOHO_MAIL_USER || 'not set'}`);
   console.log(`ZOHO_MAIL_PASSWORD: ${process.env.ZOHO_MAIL_PASSWORD ? 'set' : 'not set'}`);
   console.log(`ZOHO_MAIL_FROM: ${process.env.ZOHO_MAIL_FROM || 'not set'}`);
+  console.log(`SEND_TEST_MAIL_TO: ${process.env.SEND_TEST_MAIL_TO || 'not set'}`);
   console.log(`Running in Docker: ${process.env.RUNNING_IN_DOCKER || 'unknown'}`);
   console.log(`NODE_ENV: ${process.env.NODE_ENV || 'not set'}`);
   
@@ -97,10 +98,13 @@ async function testEmailFromDocker() {
     
     console.log('\nSending test email...');
     
-    const userEmail = process.env.ZOHO_MAIL_USER;
+    // Use the configurable test email recipient from env variables
+    const testRecipient = process.env.SEND_TEST_MAIL_TO || process.env.ZOHO_MAIL_USER;
+    console.log(`Test email will be sent to: ${testRecipient}`);
+    
     const info = await transporter.sendMail({
       from: `"Docker Test" <${process.env.ZOHO_MAIL_FROM || process.env.ZOHO_MAIL_USER}>`,
-      to: userEmail,
+      to: testRecipient,
       subject: "Docker Container Email Test",
       html: `
         <h1>Email Test from Docker Container</h1>

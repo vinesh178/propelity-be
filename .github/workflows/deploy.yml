@@ -29,22 +29,40 @@ jobs:
             # Make the scripts executable
             chmod +x deploy.sh
             
-            # Try host network mode first
-            echo "Deploying with host network mode for better connectivity..."
-            ./deploy.sh --host-network --network-test
+            # Deploy with bridge network first (more reliable)
+            echo "Deploying with bridge network configuration..."
+            ./deploy.sh
             
-            # Check if email sending works
-            echo "Testing email connectivity..."
-            if ! docker-compose exec -T app node src/network-test.js | grep -q "✅ Success: Connected to smtp.zoho.com.au:465"; then
-              echo "WARNING: Could not connect to SMTP server - trying alternative network configuration..."
-              # Try default bridge network as fallback
-              ./deploy.sh --network-test
+            # Copy diagnostic scripts to the container
+            CONTAINER_ID=$(docker-compose ps -q app)
+            echo "Container ID: $CONTAINER_ID"
+            
+            echo "Copying test scripts to container..."
+            docker cp src/network-test.js $CONTAINER_ID:/app/src/
+            docker cp src/docker-test-email.js $CONTAINER_ID:/app/src/
+            
+            # Run network tests
+            echo "Running network diagnostics..."
+            docker-compose exec -T app node src/network-test.js || echo "Network test failed, but continuing"
+            
+            # Test email connectivity
+            echo "Testing email functionality..."
+            docker-compose exec -T app node src/docker-test-email.js || echo "Email test failed, but deployment continues"
+            
+            # If needed, try host network as a last resort
+            if ! docker-compose exec -T app node src/docker-test-email.js | grep -q "Email sent successfully"; then
+              echo "Email test failed with bridge network, trying host network mode..."
+              ./deploy.sh --host-network
+              
+              # Copy test scripts again
+              CONTAINER_ID=$(docker-compose ps -q app)
+              docker cp src/network-test.js $CONTAINER_ID:/app/src/
+              docker cp src/docker-test-email.js $CONTAINER_ID:/app/src/
+              
+              # Final email test
+              docker-compose exec -T app node src/docker-test-email.js || echo "Email still failing, manual intervention needed"
             fi
             
-            # Verify service is running
-            echo "Verifying service status..."
+            # Final status check
+            echo "Final container status:"
             docker-compose ps
-            
-            # Final email test
-            echo "Running final email test..."
-            docker-compose exec -T app node src/docker-test-email.js || echo "Email test failed, but deployment continues"

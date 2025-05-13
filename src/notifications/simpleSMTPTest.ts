@@ -11,27 +11,32 @@ dotenv.config();
 async function testZohoSMTPConnection() {
   console.log('Starting simple Zoho SMTP connection test...');
   console.log('Using the following configuration:');
-  console.log(`Host: ${process.env.ZOHO_MAIL_HOST || 'smtp.zoho.com'}`);
+  console.log(`Host: ${process.env.ZOHO_MAIL_HOST || 'smtp.zoho.com.au'}`);
   console.log(`Port: ${process.env.ZOHO_MAIL_PORT || '465'}`);
   console.log(`Secure: ${process.env.ZOHO_MAIL_SECURE !== 'false'}`);
   console.log(`User: ${process.env.ZOHO_MAIL_USER}`);
   console.log(`Password: ${'*'.repeat(process.env.ZOHO_MAIL_PASSWORD?.length || 0)}`);
+  console.log(`Test Recipient: ${process.env.SEND_TEST_MAIL_TO || 'not set - using default'}`);
   
   try {
     // Create a transporter with debug options
     const transporter = nodemailer.createTransport({
-      host: process.env.ZOHO_MAIL_HOST || 'smtp.zoho.com',
+      host: process.env.ZOHO_MAIL_HOST || 'smtp.zoho.com.au',
       port: parseInt(process.env.ZOHO_MAIL_PORT || '465'),
       secure: process.env.ZOHO_MAIL_SECURE !== 'false',
       auth: {
         user: process.env.ZOHO_MAIL_USER,
         pass: process.env.ZOHO_MAIL_PASSWORD,
       },
-      connectionTimeout: 10000, // 10 seconds
-      greetingTimeout: 10000, // 10 seconds
-      socketTimeout: 30000, // 30 seconds
+      connectionTimeout: parseInt(process.env.SMTP_CONNECTION_TIMEOUT || '10000'), // 10 seconds 
+      greetingTimeout: parseInt(process.env.SMTP_GREETING_TIMEOUT || '10000'), // 10 seconds
+      socketTimeout: parseInt(process.env.SMTP_SOCKET_TIMEOUT || '30000'), // 30 seconds
       debug: true, // Enable debug output
       logger: true, // Log information to console
+      tls: {
+        // Do not fail on invalid certs
+        rejectUnauthorized: false
+      }
     });
     
     // Verify the connection
@@ -39,11 +44,15 @@ async function testZohoSMTPConnection() {
     await transporter.verify();
     console.log('SMTP connection verified successfully!');
     
+    // Determine the test recipient
+    const testRecipient = process.env.SEND_TEST_MAIL_TO || 'admin@propelity.com.au';
+    console.log(`Sending test email to: ${testRecipient}`);
+    
     // Send a simple test email
     console.log('Sending a test email...');
     const info = await transporter.sendMail({
-      from: process.env.ZOHO_MAIL_USER,
-      to: 'admin@propelity.com.au',
+      from: process.env.ZOHO_MAIL_FROM || process.env.ZOHO_MAIL_USER,
+      to: testRecipient,
       subject: 'SMTP Test',
       text: 'This is a test email to verify SMTP connection with Zoho Mail.',
       html: '<p>This is a test email to verify SMTP connection with Zoho Mail.</p>',

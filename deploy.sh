@@ -50,11 +50,15 @@ done
 if [ "$USE_HOST_NETWORK" = true ]; then
   echo "Using host network mode..."
   # Create a temporary file with host network mode enabled
-  sed 's/# network_mode: host/network_mode: host/' docker-compose.yml > docker-compose.host.yml
-  sed -i 's/networks:/# networks:/' docker-compose.host.yml
-  sed -i 's/  app-network:/  # app-network:/' docker-compose.host.yml
-  sed -i 's/    # Use explicit IPv4/    # # Use explicit IPv4/' docker-compose.host.yml
-  sed -i 's/    ipv4_address:/    # ipv4_address:/' docker-compose.host.yml
+  cat docker-compose.yml > docker-compose.host.yml
+  
+  # Replace specific lines with sed
+  sed -i 's/# network_mode: host/network_mode: host/' docker-compose.host.yml
+  # Comment out the networks section in the app service
+  sed -i '/networks:/,/ipv4_address:/s/^/# /' docker-compose.host.yml
+  # Comment out the networks section at the bottom
+  sed -i '/^networks:/,/^$/s/^/# /' docker-compose.host.yml
+  
   COMPOSE_FILE="-f docker-compose.host.yml"
 else
   COMPOSE_FILE=""
@@ -77,14 +81,20 @@ if [ $RESULT -eq 0 ]; then
   echo "\nDeployment successful. The application is available at http://localhost:3000"
   echo "To view logs: docker-compose logs -f app"
   
-  # If requested, run network tests
+  # First, make sure the network test script exists in the container
   if [ "$RUN_NETWORK_TEST" = true ]; then
+    echo "\nEnsuring network test script is available..."
+    docker cp src/network-test.js $(docker-compose $COMPOSE_FILE ps -q app):/app/src/
+    
     echo "\nRunning network connectivity tests..."
     docker-compose $COMPOSE_FILE exec app node src/network-test.js
   fi
   
   # If requested, run email test
   if [ "$RUN_EMAIL_TEST" = true ]; then
+    echo "\nEnsuring email test script is available..."
+    docker cp src/docker-test-email.js $(docker-compose $COMPOSE_FILE ps -q app):/app/src/
+    
     echo "\nRunning email test..."
     docker-compose $COMPOSE_FILE exec app node src/docker-test-email.js
   fi
