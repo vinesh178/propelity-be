@@ -133,11 +133,7 @@ export async function handleNewEnquiryNotification(enquiryId: string): Promise<v
     }
     
     // Send email notification
-    console.log('About to send email notification with data:', JSON.stringify({
-      id: enquiryData.id,
-      email: enquiryData.user?.email || 'No email found',
-      service_type: enquiryData.service_type
-    }));
+    console.log('STEP 1: About to send email notification');
     
     // Format the data for email notification
     const emailData = {
@@ -149,11 +145,25 @@ export async function handleNewEnquiryNotification(enquiryId: string): Promise<v
       phone: enquiryData.user?.phone
     };
     
-    const emailSuccess = await notifyUserAboutEnquiry(emailData);
-    if (emailSuccess) {
-      console.log(`Successfully sent email notification for enquiry ${enquiryId}`);
-    } else {
-      console.error(`Failed to send email notification for enquiry ${enquiryId}`);
+    console.log('STEP 2: Formatted email data:', JSON.stringify({
+      id: emailData.id,
+      email: emailData.email,
+      user_email: emailData.user?.email,
+      service_type: emailData.service_type
+    }));
+    
+    try {
+      console.log('STEP 3: Calling notifyUserAboutEnquiry');
+      const emailSuccess = await notifyUserAboutEnquiry(emailData);
+      console.log('STEP 4: notifyUserAboutEnquiry returned:', emailSuccess);
+      
+      if (emailSuccess) {
+        console.log(`Successfully sent email notification for enquiry ${enquiryId}`);
+      } else {
+        console.error(`Failed to send email notification for enquiry ${enquiryId}`);
+      }
+    } catch (emailError) {
+      console.error('STEP ERROR: Exception when sending email notification:', emailError);
     }
   } catch (error) {
     console.error('Error in handleNewEnquiryNotification:', error);

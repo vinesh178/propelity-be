@@ -31,12 +31,11 @@ interface EnquiryData {
  */
 function createZohoMailTransporter() {
   // Zoho Mail SMTP configuration
-  console.log('Creating mail transporter with:');
+  console.log('MAIL CONFIG: Creating mail transporter with:');
   console.log(`Host: ${process.env.ZOHO_MAIL_HOST || 'smtp.zoho.com'}`);
   console.log(`Port: ${process.env.ZOHO_MAIL_PORT || '465'}`);
   console.log(`Secure: ${process.env.ZOHO_MAIL_SECURE !== 'false'}`);
-  console.log(`User: ${process.env.ZOHO_MAIL_USER}`);
-  
+  console.log(`User: ${process.env.ZOHO_MAIL_USER}`);  console.log(`Password set: ${process.env.ZOHO_MAIL_PASSWORD ? 'Yes' : 'No'}`);  
   return nodemailer.createTransport({
     host: process.env.ZOHO_MAIL_HOST || 'smtp.zoho.com',
     port: parseInt(process.env.ZOHO_MAIL_PORT || '465'),
@@ -137,11 +136,19 @@ async function sendUserConfirmationEmail(enquiryData: EnquiryData): Promise<bool
  * @returns {Promise<boolean>} True if the notification was sent successfully, false otherwise
  */
 export async function notifyUserAboutEnquiry(enquiryData: EnquiryData): Promise<boolean> {
-  console.log('Sending confirmation email to user...');
+  console.log('MAIL STEP 1: notifyUserAboutEnquiry called with data:', JSON.stringify({
+    id: enquiryData.id,
+    email: enquiryData.email,
+    user_email: enquiryData.user?.email,
+    service_type: enquiryData.service_type
+  }));
   
   try {
+    console.log('MAIL STEP 2: Sending confirmation email to user...');
     // Send confirmation email directly using the provided enquiry data
     const notificationSent = await sendUserConfirmationEmail(enquiryData);
+    
+    console.log('MAIL STEP 3: sendUserConfirmationEmail returned:', notificationSent);
     
     if (notificationSent) {
       console.log('User confirmation email sent successfully');
@@ -151,7 +158,7 @@ export async function notifyUserAboutEnquiry(enquiryData: EnquiryData): Promise<
       return false;
     }
   } catch (err: any) {
-    console.error('Exception when sending user confirmation email:', err);
+    console.error('MAIL ERROR: Exception when sending user confirmation email:', err);
     return false;
   }
 }
