@@ -1,5 +1,6 @@
 import { supabase } from '../supabase/supabaseClient';
 import { sendEnquiryNotificationToSlack } from './slackWebhook';
+import { notifyUserAboutEnquiry } from './mailNotifications';
 
 // Define interfaces based on the actual database schema for notification purposes only
 interface User {
@@ -24,12 +25,12 @@ interface EnquiryWithUser {
 }
 
 /**
- * Fetches an enquiry with its associated user data and sends a Slack notification
- * @param {string} enquiryId - The ID of the enquiry to fetch and notify about
- * @returns {Promise<boolean>} True if the notification was sent successfully, false otherwise
+ * Fetches an enquiry with its associated user data
+ * @param {string} enquiryId - The ID of the enquiry to fetch
+ * @returns {Promise<EnquiryWithUser | null>} The enquiry data with user data, or null if not found
  */
-export async function notifySlackAboutEnquiry(enquiryId: string): Promise<boolean> {
-  console.log(`Fetching enquiry with ID ${enquiryId} for Slack notification...`);
+export async function fetchEnquiryWithUserData(enquiryId: string): Promise<EnquiryWithUser | null> {
+  console.log(`Fetching enquiry with ID ${enquiryId}...`);
   
   try {
     // Fetch the enquiry with user data using the correct table name
@@ -41,12 +42,12 @@ export async function notifySlackAboutEnquiry(enquiryId: string): Promise<boolea
     
     if (enquiryError) {
       console.error(`Error fetching enquiry with ID ${enquiryId}:`, enquiryError);
-      return false;
+      return null;
     }
     
     if (!enquiryData) {
       console.error(`No enquiry found with ID ${enquiryId}`);
-      return false;
+      return null;
     }
     
     console.log(`Found enquiry data:`, JSON.stringify(enquiryData, null, 2));
@@ -78,8 +79,22 @@ export async function notifySlackAboutEnquiry(enquiryId: string): Promise<boolea
       user: userData
     };
     
+    return combinedData;
+  } catch (err) {
+    console.error('Exception when fetching enquiry data:', err);
+    return null;
+  }
+}
+
+/**
+ * Sends a Slack notification about an enquiry
+ * @param {EnquiryWithUser} enquiryData - The enquiry data with user information
+ * @returns {Promise<boolean>} True if the notification was sent successfully, false otherwise
+ */
+export async function notifySlackAboutEnquiry(enquiryData: EnquiryWithUser): Promise<boolean> {
+  try {
     // Send notification to Slack
-    const notificationSent = await sendEnquiryNotificationToSlack(combinedData);
+    const notificationSent = await sendEnquiryNotificationToSlack(enquiryData);
     
     if (notificationSent) {
       console.log('Slack notification sent successfully');
@@ -95,17 +110,34 @@ export async function notifySlackAboutEnquiry(enquiryId: string): Promise<boolea
 }
 
 /**
- * Listens for new enquiries and sends Slack notifications
+ * Listens for new enquiries and sends Slack and email notifications
  * This function can be called after a new enquiry is created
  * @param {string} enquiryId - The ID of the newly created enquiry
  */
 export async function handleNewEnquiryNotification(enquiryId: string): Promise<void> {
   try {
-    const success = await notifySlackAboutEnquiry(enquiryId);
-    if (success) {
+    // Fetch the enquiry data once
+    const enquiryData = await fetchEnquiryWithUserData(enquiryId);
+    
+    if (!enquiryData) {
+      console.error(`Failed to fetch data for enquiry ${enquiryId}`);
+      return;
+    }
+    
+    // Send Slack notification
+    const slackSuccess = await notifySlackAboutEnquiry(enquiryData);
+    if (slackSuccess) {
       console.log(`Successfully notified Slack about enquiry ${enquiryId}`);
     } else {
       console.error(`Failed to notify Slack about enquiry ${enquiryId}`);
+    }
+    
+    // Send email notification
+    const emailSuccess = await notifyUserAboutEnquiry(enquiryData);
+    if (emailSuccess) {
+      console.log(`Successfully sent email notification for enquiry ${enquiryId}`);
+    } else {
+      console.error(`Failed to send email notification for enquiry ${enquiryId}`);
     }
   } catch (error) {
     console.error('Error in handleNewEnquiryNotification:', error);
