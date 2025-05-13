@@ -133,7 +133,23 @@ export async function handleNewEnquiryNotification(enquiryId: string): Promise<v
     }
     
     // Send email notification
-    const emailSuccess = await notifyUserAboutEnquiry(enquiryData);
+    console.log('About to send email notification with data:', JSON.stringify({
+      id: enquiryData.id,
+      email: enquiryData.user?.email || 'No email found',
+      service_type: enquiryData.service_type
+    }));
+    
+    // Format the data for email notification
+    const emailData = {
+      ...enquiryData,
+      // Add these fields at the root level if they exist in the user object
+      first_name: enquiryData.user?.first_name,
+      last_name: enquiryData.user?.last_name,
+      email: enquiryData.user?.email,
+      phone: enquiryData.user?.phone
+    };
+    
+    const emailSuccess = await notifyUserAboutEnquiry(emailData);
     if (emailSuccess) {
       console.log(`Successfully sent email notification for enquiry ${enquiryId}`);
     } else {

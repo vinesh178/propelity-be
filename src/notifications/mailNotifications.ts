@@ -60,6 +60,14 @@ function createZohoMailTransporter() {
  */
 async function sendUserConfirmationEmail(enquiryData: EnquiryData): Promise<boolean> {
   try {
+    console.log('Preparing to send confirmation email with data:', JSON.stringify({
+      id: enquiryData.id,
+      direct_email: enquiryData.email,
+      user_email: enquiryData.user?.email,
+      direct_name: enquiryData.first_name,
+      user_name: enquiryData.user?.first_name
+    }));
+    
     // Get email from either the root object or nested user object
     const email = enquiryData.email || enquiryData.user?.email;
     const firstName = enquiryData.first_name || enquiryData.user?.first_name || 'Valued Customer';
@@ -68,6 +76,8 @@ async function sendUserConfirmationEmail(enquiryData: EnquiryData): Promise<bool
       console.warn('Cannot send confirmation email: No email address available');
       return false;
     }
+    
+    console.log(`Will send confirmation email to: ${email}`);
 
     // Create a transporter using Zoho Mail configuration
     const transporter = createZohoMailTransporter();
