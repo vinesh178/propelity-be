@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enquiry Received</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .logo {
+      max-width: 150px;
+      height: auto;
+    }
+    .content {
+      background-color: #f9f9f9;
+      padding: 20px;
+      border-radius: 5px;
+    }
+    .footer {
+      margin-top: 30px;
+      font-size: 12px;
+      color: #777;
+      text-align: center;
+    }    .footer-divider {
+      margin: 15px 0;
+      border: 0;
+      border-top: 1px solid #ddd;
+    }
+    .disclaimer {
+      font-size: 10px;
+      text-align: left;
+      color: #999;
+      margin-top: 15px;
+      line-height: 1.4;
+    }
+    .disclaimer p {
+      margin-bottom: 10px;
+    }    .button {
+      display: inline-block;
+      background-color: #4CAF50;
+      color: white;
+      padding: 10px 20px;
+      text-decoration: none;
+      border-radius: 5px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <a href="https://propelity.com.au">
+      <img src="https://propelity.com.au/icons/propelity.png" alt="Propelity" class="logo">
+    </a>
+    <h1>Thank You for Your Enquiry</h1>
+  </div>
+  
+  <div class="content">
+    <p>Dear {{firstName}},</p>
+    
+    <p>Thank you for contacting us. We have received your enquiry regarding <strong>{{serviceType}}</strong>.</p>
+    
+    <p>Our team is reviewing your request and will get back to you as soon as possible. Here's a summary of the information you provided:</p>
+    
+    <ul>
+      <li><strong>Service Type:</strong> {{serviceType}}</li>
+      <li><strong>Budget Range:</strong> {{budgetRange}}</li>
+      <li><strong>Additional Information:</strong> {{additionalInfo}}</li>
+    </ul>
+    
+    <p>If you have any further questions or need to provide additional information, please don't hesitate to reply to this mail.</p>
+    
+    <p>Best regards,<br>
+    The Propelity Team</p>
+  </div>
+  
+  <div class="footer">
+    <p>© 2025 Propelity. All rights reserved.</p>
+    <hr class="footer-divider">
+    <div class="disclaimer">
+      <p><strong>Important:</strong> We are a marketplace platform only. We do not employ or contract any buyer agents or mortgage brokers. All services are provided by independent professionals. Users are responsible for conducting their own due diligence before engaging any service provider.</p>
+      
+      <p><strong>Disclaimer:</strong> The information contained in this website is factual in nature and for general information purposes only. Propelity accepts no responsibility with regard to any real estate transactions as a result of using this website or any linked external websites. We are not associated with the REIA, REINSW, REIV, REIQ, REIWA, REISA, REIACT, REINT, REIT or Real Estate Business Online.</p>
+      
+      <p>We cannot guarantee the quality of any advice given by individual agents or organisations listed on the website. Home buyers/sellers or investors should conduct their own due diligence before proceeding to take the services of a Buyer's agent or Mortgage broker.</p>
+      
+      <p>Propelity (propelity.com.au) allows buyers agents and mortgage brokers who meet the website selection criteria to advertise and sponsor pages on the website. We also receive payments from agents where an agent enquiry form is submitted and a property is bought or mortgage services rendered when we introduce users of the website to buyers agents, and/or mortgage brokers. Where an agent enquiry form is submitted through the website, we will introduce users to agents listed on the website where appropriate, but we may on occasion provide user enquiry details to agents not listed on the website if the enquiry is deemed to not match the agents services currently listed on the website.</p>
+    </div>
+  </div>
+</body>
+</html>
