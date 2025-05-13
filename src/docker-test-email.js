@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
+const dns = require('dns');
 
 async function testEmailFromDocker() {
   console.log('==== DOCKER EMAIL TEST ====');
@@ -11,9 +12,40 @@ async function testEmailFromDocker() {
   console.log(`ZOHO_MAIL_USER: ${process.env.ZOHO_MAIL_USER || 'not set'}`);
   console.log(`ZOHO_MAIL_PASSWORD: ${process.env.ZOHO_MAIL_PASSWORD ? 'set' : 'not set'}`);
   console.log(`ZOHO_MAIL_FROM: ${process.env.ZOHO_MAIL_FROM || 'not set'}`);
+  console.log(`Running in Docker: ${process.env.RUNNING_IN_DOCKER || 'unknown'}`);
+  console.log(`NODE_ENV: ${process.env.NODE_ENV || 'not set'}`);
+  
+  // Check DNS resolution to verify network connectivity
+  console.log('\nChecking DNS resolution...');
   
   try {
-    console.log('\nCreating mail transporter...');
+    console.log(`Resolving ${process.env.ZOHO_MAIL_HOST}...`);
+    const addresses = await new Promise((resolve, reject) => {
+      dns.resolve(process.env.ZOHO_MAIL_HOST, (err, addresses) => {
+        if (err) reject(err);
+        else resolve(addresses);
+      });
+    });
+    console.log(`DNS resolution successful: ${JSON.stringify(addresses)}`);
+  } catch (dnsError) {
+    console.error(`DNS resolution failed: ${dnsError.message}`);
+    console.log('Trying to resolve google.com as a test...');
+    try {
+      const googleAddresses = await new Promise((resolve, reject) => {
+        dns.resolve('google.com', (err, addresses) => {
+          if (err) reject(err);
+          else resolve(addresses);
+        });
+      });
+      console.log(`Google.com resolution successful: ${JSON.stringify(googleAddresses)}`);
+    } catch (googleDnsError) {
+      console.error(`Google.com resolution failed: ${googleDnsError.message}`);
+      console.error('This indicates a serious DNS or network connectivity issue in the container');
+    }
+  }
+  
+  try {
+    console.log('\nCreating mail transporter with extended timeouts...');
     const transporter = nodemailer.createTransport({
       host: process.env.ZOHO_MAIL_HOST || 'smtp.zoho.com',
       port: parseInt(process.env.ZOHO_MAIL_PORT || '465'),
@@ -22,12 +54,14 @@ async function testEmailFromDocker() {
         user: process.env.ZOHO_MAIL_USER,
         pass: process.env.ZOHO_MAIL_PASSWORD
       },
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 30000
+      connectionTimeout: 30000,    // 30 seconds
+      greetingTimeout: 30000,      // 30 seconds
+      socketTimeout: 60000,        // 60 seconds
+      debug: true,                 // Enable debugging
+      logger: true                 // Enable logging
     });
     
-    console.log('Verifying connection...');
+    console.log('Verifying connection with extended timeouts...');
     await transporter.verify();
     console.log('SMTP connection verified!');
     

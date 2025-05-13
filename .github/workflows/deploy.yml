@@ -18,4 +18,21 @@ jobs:
           script: |
             cd /root/workspace/propelity-be
             git pull
-            ./docker-build.sh && ./docker-run.sh 
+            
+            # Ensure docker-compose is installed
+            if ! command -v docker-compose &> /dev/null; then
+              echo "Installing docker-compose..."
+              apt-get update
+              apt-get install -y docker-compose
+            fi
+            
+            # Use the new deployment script
+            chmod +x deploy.sh
+            ./deploy.sh
+            
+            # Verify service is running
+            echo "Verifying service status..."
+            docker-compose ps
+            
+            # Test email if needed (uncomment if you want to test emails on every deploy)
+            # ./deploy.sh --test-email 

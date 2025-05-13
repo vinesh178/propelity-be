@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Build the Docker image
-docker build -t admin-dashboard .
+# Build the Docker image using docker-compose
+docker-compose build app
 
 # Show the built image
 echo "\nDocker image built successfully:"

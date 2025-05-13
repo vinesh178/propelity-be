@@ -21,6 +21,19 @@ services:
     env_file:
       - .env
     restart: unless-stopped
+    # Use network_mode: host for better connectivity (only works on Linux hosts)
+    # Uncomment one of these network options:
+    # network_mode: host  # Option 1: Use host network (best connectivity but only on Linux hosts)
+    networks:
+      - app-network  # Option 2: Use custom bridge network
+    dns:
+      - 8.8.8.8  # Use Google's DNS for better external connectivity
+      - 1.1.1.1  # Cloudflare DNS as backup
     # If you need to persist data, uncomment and configure volumes
     # volumes:
     #   - ./data:/app/data
+
+# Define a custom bridge network
+networks:
+  app-network:
+    driver: bridge

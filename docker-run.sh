@@ -8,45 +8,28 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
-# Function to check if a container exists
-container_exists() {
-  docker ps -a --format '{{.Names}}' | grep -q "^$1$"
-  return $?
-}
+# Stop any existing containers managed by docker-compose
+echo "Stopping any existing containers..."
+docker-compose down
 
-# Check if port 3000 is in use by any container and stop it
+# Check if port 3000 is in use by any container not managed by docker-compose
 PORT_CONTAINER=$(docker ps -q --filter "publish=3000")
 if [ -n "$PORT_CONTAINER" ]; then
-  echo "Stopping container using port 3000..."
+  echo "Port 3000 is already in use by another container. Stopping it..."
   docker stop $PORT_CONTAINER
   docker rm $PORT_CONTAINER
   echo "Container using port 3000 stopped and removed."
 fi
 
-# Check specifically for our named container and force remove it if it exists
-if container_exists "admin-dashboard"; then
-  echo "Removing existing admin-dashboard container..."
-  docker stop admin-dashboard 2>/dev/null || true
-  docker rm -f admin-dashboard 2>/dev/null || true
-  
-  # Double-check if container was removed
-  if container_exists "admin-dashboard"; then
-    echo "Failed to remove container. Trying with force option..."
-    docker rm -f admin-dashboard
-  fi
-  
-  echo "Container removed."
-fi
-
-# Run the Docker container
-echo "Starting admin-dashboard container..."
-docker run -p 3000:3000 --env-file .env -d --name admin-dashboard admin-dashboard
+# Start the containers using docker-compose
+echo "Starting containers with docker-compose..."
+docker-compose up -d
 
 RESULT=$?
 if [ $RESULT -eq 0 ]; then
-  echo "\nContainer started successfully. The application is available at http://localhost:3000"
-  echo "To view logs: docker logs admin-dashboard"
+  echo "\nContainers started successfully. The application is available at http://localhost:3000"
+  echo "To view logs: docker-compose logs -f app"
 else
-  echo "\nFailed to start container. Please check for errors above."
+  echo "\nFailed to start containers. Please check for errors above."
   exit $RESULT
 fi
