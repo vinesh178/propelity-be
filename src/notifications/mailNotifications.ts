@@ -59,27 +59,40 @@ function createZohoMailTransporter() {
  */
 async function sendUserConfirmationEmail(enquiryData: EnquiryData): Promise<boolean> {
   try {
-    console.log('Preparing to send confirmation email with data:', JSON.stringify({
-      id: enquiryData.id,
-      direct_email: enquiryData.email,
-      user_email: enquiryData.user?.email,
-      direct_name: enquiryData.first_name,
-      user_name: enquiryData.user?.first_name
-    }));
+    console.log('DEBUG: Starting sendUserConfirmationEmail');
+    console.log('DEBUG: Full enquiry data:', JSON.stringify(enquiryData, null, 2));
+    
+    // Validate required fields for the email
+    if (!enquiryData.id) {
+      console.error('DEBUG: Cannot send email - missing enquiry ID');
+      return false;
+    }
+    
+    if (!enquiryData.service_type) {
+      console.error('DEBUG: Cannot send email - missing service_type');
+      return false;
+    }
+    
+    if (!enquiryData.budget_range) {
+      console.error('DEBUG: Cannot send email - missing budget_range');
+      return false;
+    }
     
     // Get email from either the root object or nested user object
     const email = enquiryData.email || enquiryData.user?.email;
     const firstName = enquiryData.first_name || enquiryData.user?.first_name || 'Valued Customer';
+    
+    console.log('DEBUG: Extracted email:', email);
+    console.log('DEBUG: Extracted firstName:', firstName);
     
     if (!email) {
       console.warn('Cannot send confirmation email: No email address available');
       return false;
     }
     
-    console.log(`Will send confirmation email to: ${email}`);
-
-    // Create a transporter using Zoho Mail configuration
+    console.log('DEBUG: Creating mail transporter...');
     const transporter = createZohoMailTransporter();
+    console.log('DEBUG: Mail transporter created successfully');
 
     // Prepare template data with formatted service type
     let formattedServiceType = enquiryData.service_type;
@@ -95,37 +108,74 @@ async function sendUserConfirmationEmail(enquiryData: EnquiryData): Promise<bool
       case 'mortgage_broker':
         formattedServiceType = 'Mortgage Broker Services';
         break;
-      // Default case will use the original service_type value
+      default:
+        // For safety, set a default readable format if the service_type is unknown
+        formattedServiceType = 'Property Services';
     }
     
+    console.log('DEBUG: Formatted service type:', formattedServiceType);
+    
+    // Ensure all template data fields are present with fallbacks
     const templateData: EnquiryReceivedTemplateData = {
       firstName: firstName,
       serviceType: formattedServiceType,
-      budgetRange: enquiryData.budget_range,
+      budgetRange: enquiryData.budget_range || 'Not specified',
       additionalInfo: enquiryData.additional_info || 'None provided'
     };
 
-    // Load and process the template
-    const emailContent = loadTemplate('enquiryReceived', templateData);
+    console.log('DEBUG: Template data prepared:', JSON.stringify(templateData, null, 2));
+    console.log('DEBUG: Loading email template...');
 
+    // Load and process the template
+    let emailContent;
+    try {
+      emailContent = loadTemplate('enquiryReceived', templateData);
+      console.log('DEBUG: Email template loaded successfully');
+    } catch (templateError) {
+      console.error('DEBUG: Failed to load email template:', templateError);
+      // Provide a fallback plain text email in case template loading fails
+      emailContent = `
+        <html>
+        <body>
+          <h1>Thank You for Your Enquiry</h1>
+          <p>Dear ${firstName},</p>
+          <p>Thank you for contacting us. We have received your enquiry regarding ${formattedServiceType}.</p>
+          <p>Our team is reviewing your request and will get back to you as soon as possible.</p>
+          <p>Best regards,<br>The Propelity Team</p>
+        </body>
+        </html>
+      `;
+      console.log('DEBUG: Using fallback email template');
+    }
+
+    console.log('DEBUG: Preparing to send email...');
+    
+    // Ensure we have a valid from address
+    const fromAddress = process.env.ZOHO_MAIL_FROM || process.env.ZOHO_MAIL_USER;
+    if (!fromAddress) {
+      console.error('DEBUG: No from address available for sending email');
+      return false;
+    }
+    
     // Send the email
     const info = await transporter.sendMail({
-      from: `"Propelity" <${process.env.ZOHO_MAIL_FROM || process.env.ZOHO_MAIL_USER}>`,
+      from: `"Propelity" <${fromAddress}>`,
       to: email,
       subject: 'Your Enquiry Has Been Received',
       html: emailContent,
       headers: {
-        'X-Entity-Ref-ID': enquiryData.id, // Helps with email threading and tracking
-        'List-Unsubscribe': '<mailto:unsubscribe@propelity.com.au>', // Good practice for deliverability
+        'X-Entity-Ref-ID': enquiryData.id,
+        'List-Unsubscribe': '<mailto:unsubscribe@propelity.com.au>',
       },
-      priority: 'high', // Mark as important
-      replyTo: 'admin@propelity.com.au', // Provide a proper reply-to address
+      priority: 'high',
+      replyTo: 'admin@propelity.com.au',
     });
 
-    console.log(`User confirmation email sent successfully: ${info.messageId}`);
+    console.log('DEBUG: Email sent successfully. Message ID:', info.messageId);
     return true;
   } catch (error: any) {
-    console.error('Error sending user confirmation email:', error);
+    console.error('DEBUG: Error in sendUserConfirmationEmail:', error);
+    console.error('DEBUG: Error stack:', error.stack);
     return false;
   }
 }

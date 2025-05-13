@@ -116,6 +116,8 @@ export async function notifySlackAboutEnquiry(enquiryData: EnquiryWithUser): Pro
  */
 export async function handleNewEnquiryNotification(enquiryId: string): Promise<void> {
   try {
+    console.log('NOTIFICATION: Starting handleNewEnquiryNotification for enquiry:', enquiryId);
+    
     // Fetch the enquiry data once
     const enquiryData = await fetchEnquiryWithUserData(enquiryId);
     
@@ -123,6 +125,13 @@ export async function handleNewEnquiryNotification(enquiryId: string): Promise<v
       console.error(`Failed to fetch data for enquiry ${enquiryId}`);
       return;
     }
+    
+    console.log('NOTIFICATION: Enquiry data fetched successfully:', JSON.stringify({
+      id: enquiryData.id,
+      service_type: enquiryData.service_type,
+      user_id: enquiryData.user_id,
+      has_user: !!enquiryData.user
+    }));
     
     // Send Slack notification
     const slackSuccess = await notifySlackAboutEnquiry(enquiryData);
@@ -133,29 +142,64 @@ export async function handleNewEnquiryNotification(enquiryId: string): Promise<v
     }
     
     // Send email notification
-    console.log('STEP 1: About to send email notification');
+    console.log('NOTIFICATION: Preparing data for email notification');
     
-    // Format the data for email notification
+    // Ensure all required data is present for the email
     const emailData = {
-      ...enquiryData,
-      // Add these fields at the root level if they exist in the user object
-      first_name: enquiryData.user?.first_name,
-      last_name: enquiryData.user?.last_name,
-      email: enquiryData.user?.email,
-      phone: enquiryData.user?.phone
+      id: enquiryData.id,
+      service_type: enquiryData.service_type,
+      budget_range: enquiryData.budget_range || 'Not specified',
+      additional_info: enquiryData.additional_info || '',
+      // Use both direct fields and user fields to ensure maximum compatibility
+      first_name: enquiryData.user?.first_name || '',
+      last_name: enquiryData.user?.last_name || '',
+      email: enquiryData.user?.email || '', // Primary email source from user
+      phone: enquiryData.user?.phone || '',
+      // Keep the user object for backward compatibility
+      user: enquiryData.user
     };
     
-    console.log('STEP 2: Formatted email data:', JSON.stringify({
+    console.log('NOTIFICATION: Email data prepared:', JSON.stringify({
       id: emailData.id,
       email: emailData.email,
       user_email: emailData.user?.email,
-      service_type: emailData.service_type
+      first_name: emailData.first_name,
+      service_type: emailData.service_type,
+      has_required_fields: !!(emailData.service_type && emailData.budget_range)
     }));
     
+    // If no email is available directly, try to extract it from other sources
+    if (!emailData.email && !emailData.user?.email) {
+      console.error('NOTIFICATION: No email address found in enquiry data');
+      
+      // Try to fetch a valid email from the database if needed
+      if (enquiryData.user_id) {
+        console.log('NOTIFICATION: Attempting to fetch user email from user_id:', enquiryData.user_id);
+        const { data: userData, error } = await supabase
+          .from('propelity_users')
+          .select('email')
+          .eq('id', enquiryData.user_id)
+          .single();
+          
+        if (userData?.email) {
+          console.log('NOTIFICATION: Found user email from database lookup:', userData.email);
+          emailData.email = userData.email;
+        } else {
+          console.error('NOTIFICATION: Could not find user email in database:', error?.message || 'No user found');
+        }
+      }
+    }
+    
+    // Final check before sending email
+    if (!emailData.email && !emailData.user?.email) {
+      console.error('NOTIFICATION: Cannot send email notification - no valid email address found');
+      return;
+    }
+    
     try {
-      console.log('STEP 3: Calling notifyUserAboutEnquiry');
+      console.log('NOTIFICATION: Calling notifyUserAboutEnquiry');
       const emailSuccess = await notifyUserAboutEnquiry(emailData);
-      console.log('STEP 4: notifyUserAboutEnquiry returned:', emailSuccess);
+      console.log('NOTIFICATION: notifyUserAboutEnquiry returned:', emailSuccess);
       
       if (emailSuccess) {
         console.log(`Successfully sent email notification for enquiry ${enquiryId}`);
@@ -163,7 +207,7 @@ export async function handleNewEnquiryNotification(enquiryId: string): Promise<v
         console.error(`Failed to send email notification for enquiry ${enquiryId}`);
       }
     } catch (emailError) {
-      console.error('STEP ERROR: Exception when sending email notification:', emailError);
+      console.error('NOTIFICATION ERROR: Exception when sending email notification:', emailError);
     }
   } catch (error) {
     console.error('Error in handleNewEnquiryNotification:', error);
