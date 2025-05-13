@@ -39,6 +39,8 @@ COPY --from=build --chown=appuser:appgroup /app/dist ./dist
 COPY --from=build --chown=appuser:appgroup /app/public ./public
 COPY --from=build --chown=appuser:appgroup /app/node_modules ./node_modules
 COPY --from=build --chown=appuser:appgroup /app/package.json ./
+# Copy src directory for email templates and other resources
+COPY --from=build --chown=appuser:appgroup /app/src ./src
 
 # Set proper permissions for the application directory
 RUN chown -R appuser:appgroup /app && \

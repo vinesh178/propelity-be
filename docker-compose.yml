@@ -5,14 +5,21 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: admin-dashboard
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
-      # Add other environment variables here
-      # - SUPABASE_URL=your_supabase_url
-      # - SUPABASE_KEY=your_supabase_key
+      # Email configuration settings
+      - ZOHO_MAIL_HOST=${ZOHO_MAIL_HOST:-smtp.zoho.com}
+      - ZOHO_MAIL_PORT=${ZOHO_MAIL_PORT:-465}
+      - ZOHO_MAIL_USER=${ZOHO_MAIL_USER}
+      - ZOHO_MAIL_PASSWORD=${ZOHO_MAIL_PASSWORD}
+      - ZOHO_MAIL_FROM=${ZOHO_MAIL_FROM}
+      - ZOHO_MAIL_SECURE=${ZOHO_MAIL_SECURE:-true}
+    env_file:
+      - .env
     restart: unless-stopped
     # If you need to persist data, uncomment and configure volumes
     # volumes:
