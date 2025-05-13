@@ -12,28 +12,51 @@ services:
       - NODE_ENV=production
       - PORT=3000
       # Email configuration settings
-      - ZOHO_MAIL_HOST=${ZOHO_MAIL_HOST:-smtp.zoho.com}
+      - ZOHO_MAIL_HOST=${ZOHO_MAIL_HOST:-smtp.zoho.com.au}
       - ZOHO_MAIL_PORT=${ZOHO_MAIL_PORT:-465}
       - ZOHO_MAIL_USER=${ZOHO_MAIL_USER}
       - ZOHO_MAIL_PASSWORD=${ZOHO_MAIL_PASSWORD}
       - ZOHO_MAIL_FROM=${ZOHO_MAIL_FROM}
       - ZOHO_MAIL_SECURE=${ZOHO_MAIL_SECURE:-true}
+      # Set longer timeout values
+      - SMTP_CONNECTION_TIMEOUT=60000
+      - SMTP_GREETING_TIMEOUT=60000
+      - SMTP_SOCKET_TIMEOUT=120000
     env_file:
       - .env
     restart: unless-stopped
+    networks:
+      app-network:
+        # Use explicit IPv4 address (no subnet needed)
+        ipv4_address: 172.20.0.2
+    dns:
+      - 8.8.8.8  # Google DNS
+      - 1.1.1.1  # Cloudflare DNS
+      - 9.9.9.9  # Quad9 DNS (additional option)
+    extra_hosts:
+      - "smtp.zoho.com.au:103.91.166.141" # Add explicit host mapping
+    sysctls:
+      - net.ipv4.ip_local_port_range=1024 65535
+      - net.ipv4.tcp_fin_timeout=30
+    # Increase ulimits for network connections
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     # Use network_mode: host for better connectivity (only works on Linux hosts)
     # Uncomment one of these network options:
     # network_mode: host  # Option 1: Use host network (best connectivity but only on Linux hosts)
-    networks:
-      - app-network  # Option 2: Use custom bridge network
-    dns:
-      - 8.8.8.8  # Use Google's DNS for better external connectivity
-      - 1.1.1.1  # Cloudflare DNS as backup
+    # networks:
+    #   - app-network  # Option 2: Use custom bridge network
     # If you need to persist data, uncomment and configure volumes
     # volumes:
     #   - ./data:/app/data
 
-# Define a custom bridge network
+# Define a custom bridge network with explicit subnet
 networks:
   app-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1

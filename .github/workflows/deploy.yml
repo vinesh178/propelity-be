@@ -26,13 +26,25 @@ jobs:
               apt-get install -y docker-compose
             fi
             
-            # Use the new deployment script
+            # Make the scripts executable
             chmod +x deploy.sh
-            ./deploy.sh
+            
+            # Try host network mode first
+            echo "Deploying with host network mode for better connectivity..."
+            ./deploy.sh --host-network --network-test
+            
+            # Check if email sending works
+            echo "Testing email connectivity..."
+            if ! docker-compose exec -T app node src/network-test.js | grep -q "✅ Success: Connected to smtp.zoho.com.au:465"; then
+              echo "WARNING: Could not connect to SMTP server - trying alternative network configuration..."
+              # Try default bridge network as fallback
+              ./deploy.sh --network-test
+            fi
             
             # Verify service is running
             echo "Verifying service status..."
             docker-compose ps
             
-            # Test email if needed (uncomment if you want to test emails on every deploy)
-            # ./deploy.sh --test-email 
+            # Final email test
+            echo "Running final email test..."
+            docker-compose exec -T app node src/docker-test-email.js || echo "Email test failed, but deployment continues"

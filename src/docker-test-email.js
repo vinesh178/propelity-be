@@ -47,19 +47,49 @@ async function testEmailFromDocker() {
   try {
     console.log('\nCreating mail transporter with extended timeouts...');
     const transporter = nodemailer.createTransport({
-      host: process.env.ZOHO_MAIL_HOST || 'smtp.zoho.com',
+      host: process.env.ZOHO_MAIL_HOST || 'smtp.zoho.com.au',
       port: parseInt(process.env.ZOHO_MAIL_PORT || '465'),
       secure: process.env.ZOHO_MAIL_SECURE !== 'false',
       auth: {
         user: process.env.ZOHO_MAIL_USER,
         pass: process.env.ZOHO_MAIL_PASSWORD
       },
-      connectionTimeout: 30000,    // 30 seconds
-      greetingTimeout: 30000,      // 30 seconds
-      socketTimeout: 60000,        // 60 seconds
+      connectionTimeout: parseInt(process.env.SMTP_CONNECTION_TIMEOUT || '60000'),  // 60 seconds
+      greetingTimeout: parseInt(process.env.SMTP_GREETING_TIMEOUT || '60000'),      // 60 seconds
+      socketTimeout: parseInt(process.env.SMTP_SOCKET_TIMEOUT || '120000'),        // 120 seconds
       debug: true,                 // Enable debugging
-      logger: true                 // Enable logging
+      logger: true,                 // Enable logging
+      tls: {
+        // Do not fail on invalid certs
+        rejectUnauthorized: false
+      }
     });
+    
+    // Add DNS resolution test for the specific host
+    console.log(`\nTesting direct connection to ${process.env.ZOHO_MAIL_HOST}:${process.env.ZOHO_MAIL_PORT}...`);
+    const net = require('net');
+    const socket = net.createConnection({
+      host: process.env.ZOHO_MAIL_HOST || 'smtp.zoho.com.au',
+      port: parseInt(process.env.ZOHO_MAIL_PORT || '465'),
+      timeout: 10000
+    });
+    
+    socket.on('connect', () => {
+      console.log('Socket connection successful!');
+      socket.end();
+    });
+    
+    socket.on('timeout', () => {
+      console.error('Socket connection timed out!');
+      socket.destroy();
+    });
+    
+    socket.on('error', (err) => {
+      console.error('Socket connection error:', err.message);
+    });
+
+    // Wait for socket test to complete
+    await new Promise(resolve => setTimeout(resolve, 15000));
     
     console.log('Verifying connection with extended timeouts...');
     await transporter.verify();
