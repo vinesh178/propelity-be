@@ -169,17 +169,24 @@ app.post('/api/webhooks/supabase', express.json(), async (req: Request, res: Res
     // Add logging before notification
     if ((type === 'INSERT' || type === 'insert') && table === 'enquiries' && record && record.id) {
       console.log('New enquiry detected:', record.id);
+      console.log('WEBHOOK: Starting notification process for enquiry:', record.id);
+      
       try {
+        console.log('WEBHOOK: Calling handleNewEnquiryNotification for enquiry:', record.id);
         await handleNewEnquiryNotification(record.id);
+        console.log('WEBHOOK: handleNewEnquiryNotification completed successfully for enquiry:', record.id);
         console.log('Notification triggered for new enquiry:', record.id);
       } catch (notifyErr) {
-        console.error('Error in handleNewEnquiryNotification:', notifyErr);
+        console.error('WEBHOOK ERROR: Error in handleNewEnquiryNotification:', notifyErr);
+        console.error('WEBHOOK ERROR: Stack trace:', notifyErr instanceof Error ? notifyErr.stack : 'No stack trace');
+        
         // Try direct Slack notification as fallback
+        console.log('WEBHOOK: Attempting fallback Slack notification for enquiry:', record.id);
         try {
           await sendEnquiryNotificationToSlack(record);
-          console.log('Fallback: Direct Slack notification sent.');
+          console.log('WEBHOOK: Fallback Slack notification sent successfully');
         } catch (slackErr) {
-          console.error('Fallback: Error sending direct Slack notification:', slackErr);
+          console.error('WEBHOOK ERROR: Fallback Slack notification failed:', slackErr);
         }
       }
     } else if (record) {
@@ -198,6 +205,9 @@ app.post('/api/webhooks/supabase', express.json(), async (req: Request, res: Res
     return res.status(200).json({ message: 'Webhook received and processed' });
   } catch (error) {
     console.error('Error processing webhook:', error);
+    if (error instanceof Error) {
+      console.error('Webhook error stack:', error.stack);
+    }
     return res.status(200).json({ message: 'Webhook received with errors' });
   }
 });

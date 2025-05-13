@@ -195,6 +195,13 @@ export async function notifyUserAboutEnquiry(enquiryData: EnquiryData): Promise<
   
   try {
     console.log('MAIL STEP 2: Sending confirmation email to user...');
+    
+    // Ensure we have an email address available
+    if (!enquiryData.email && !enquiryData.user?.email) {
+      console.error('MAIL ERROR: No email address available, cannot send email notification');
+      return false;
+    }
+    
     // Send confirmation email directly using the provided enquiry data
     const notificationSent = await sendUserConfirmationEmail(enquiryData);
     
@@ -205,10 +212,23 @@ export async function notifyUserAboutEnquiry(enquiryData: EnquiryData): Promise<
       return true;
     } else {
       console.warn('Failed to send user confirmation email');
+      
+      // Log more details about what might have gone wrong
+      console.error('MAIL ERROR: Failed to send email. Details:', JSON.stringify({
+        id: enquiryData.id,
+        has_email: !!enquiryData.email,
+        has_user_email: !!enquiryData.user?.email,
+        service_type: enquiryData.service_type,
+        budget_range: enquiryData.budget_range,
+        first_name: enquiryData.first_name || enquiryData.user?.first_name,
+      }));
+      
       return false;
     }
   } catch (err: any) {
     console.error('MAIL ERROR: Exception when sending user confirmation email:', err);
+    console.error('MAIL ERROR: Stack trace:', err.stack);
+    console.error('MAIL ERROR: Failed for enquiry:', enquiryData.id);
     return false;
   }
 }
