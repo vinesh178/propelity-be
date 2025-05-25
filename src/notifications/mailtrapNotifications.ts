@@ -16,6 +16,24 @@ interface EnquiryData {
 }
 
 /**
+ * Formats the service type into a user-friendly string
+ * @param {string} serviceType - The raw service type from the database
+ * @returns {string} The formatted service type
+ */
+function formatServiceType(serviceType: string): string {
+  switch (serviceType) {
+    case 'both':
+      return 'Both Buyer Agent and Mortgage Broker Services';
+    case 'buyer_agent':
+      return 'Buyer Agent Services';
+    case 'mortgage_broker':
+      return 'Mortgage Broker Services';
+    default:
+      return serviceType;
+  }
+}
+
+/**
  * Sends a confirmation email to the user who submitted the enquiry using Mailtrap API
  * @param {EnquiryData} enquiryData - The enquiry data
  * @returns {Promise<boolean>} True if the email was sent successfully, false otherwise
@@ -34,7 +52,7 @@ async function sendUserConfirmationEmail(enquiryData: EnquiryData): Promise<bool
     // Prepare template data
     const templateData = {
       firstName: firstName,
-      serviceType: enquiryData.service_type,
+      formattedServiceType: formatServiceType(enquiryData.service_type),
       budgetRange: enquiryData.budget_range,
       additionalInfo: enquiryData.additional_info || 'None provided'
     };
