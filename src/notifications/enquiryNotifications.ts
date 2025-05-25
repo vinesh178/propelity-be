@@ -1,5 +1,6 @@
 import { supabase } from '../supabase/supabaseClient';
 import { sendEnquiryNotificationToSlack } from './slackWebhook';
+import { handleNewEnquiryEmailNotification } from './mailtrapNotifications';
 
 // Define interfaces based on the actual database schema for notification purposes only
 interface User {
@@ -26,9 +27,9 @@ interface EnquiryWithUser {
 /**
  * Fetches an enquiry with its associated user data and sends a Slack notification
  * @param {string} enquiryId - The ID of the enquiry to fetch and notify about
- * @returns {Promise<boolean>} True if the notification was sent successfully, false otherwise
+ * @returns {Promise<{success: boolean, data?: EnquiryWithUser}>} Object containing success status and enquiry data
  */
-export async function notifySlackAboutEnquiry(enquiryId: string): Promise<boolean> {
+export async function notifySlackAboutEnquiry(enquiryId: string): Promise<{success: boolean, data?: EnquiryWithUser}> {
   console.log(`Fetching enquiry with ID ${enquiryId} for Slack notification...`);
   
   try {
@@ -41,12 +42,12 @@ export async function notifySlackAboutEnquiry(enquiryId: string): Promise<boolea
     
     if (enquiryError) {
       console.error(`Error fetching enquiry with ID ${enquiryId}:`, enquiryError);
-      return false;
+      return { success: false };
     }
     
     if (!enquiryData) {
       console.error(`No enquiry found with ID ${enquiryId}`);
-      return false;
+      return { success: false };
     }
     
     console.log(`Found enquiry data:`, JSON.stringify(enquiryData, null, 2));
@@ -83,14 +84,14 @@ export async function notifySlackAboutEnquiry(enquiryId: string): Promise<boolea
     
     if (notificationSent) {
       console.log('Slack notification sent successfully');
-      return true;
+      return { success: true, data: combinedData };
     } else {
       console.warn('Failed to send Slack notification');
-      return false;
+      return { success: false, data: combinedData };
     }
   } catch (err) {
     console.error('Exception when sending Slack notification:', err);
-    return false;
+    return { success: false };
   }
 }
 
@@ -101,11 +102,20 @@ export async function notifySlackAboutEnquiry(enquiryId: string): Promise<boolea
  */
 export async function handleNewEnquiryNotification(enquiryId: string): Promise<void> {
   try {
-    const success = await notifySlackAboutEnquiry(enquiryId);
-    if (success) {
+    // Send Slack notification to admin and get enquiry data
+    const { success: slackSuccess, data: enquiryData } = await notifySlackAboutEnquiry(enquiryId);
+    
+    if (slackSuccess) {
       console.log(`Successfully notified Slack about enquiry ${enquiryId}`);
     } else {
       console.error(`Failed to notify Slack about enquiry ${enquiryId}`);
+    }
+
+    // If we have enquiry data, send email notification to user
+    if (enquiryData) {
+      await handleNewEnquiryEmailNotification(enquiryData);
+    } else {
+      console.error('Cannot send email notification: No enquiry data available');
     }
   } catch (error) {
     console.error('Error in handleNewEnquiryNotification:', error);
