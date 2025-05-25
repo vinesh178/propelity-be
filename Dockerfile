@@ -39,8 +39,12 @@ COPY --from=build --chown=appuser:appgroup /app/dist ./dist
 COPY --from=build --chown=appuser:appgroup /app/public ./public
 COPY --from=build --chown=appuser:appgroup /app/node_modules ./node_modules
 COPY --from=build --chown=appuser:appgroup /app/package.json ./
-# Copy src directory for email templates and other resources
-COPY --from=build --chown=appuser:appgroup /app/src ./src
+
+# Create templates directory in dist
+RUN mkdir -p /app/dist/notifications/templates
+
+# Copy email templates to the correct location
+COPY --from=build --chown=appuser:appgroup /app/src/notifications/templates/*.html /app/dist/notifications/templates/
 
 # Set proper permissions for the application directory
 RUN chown -R appuser:appgroup /app && \
