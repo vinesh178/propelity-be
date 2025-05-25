@@ -67,12 +67,20 @@
   <div class="content">
     <p>Dear {{firstName}},</p>
     
-    <p>Thank you for contacting us. We have received your enquiry regarding <strong>{{serviceType}}</strong>.</p>
+    {{#with (lookup . 'serviceType')}}
+      {{#set 'displayServiceType'}}
+        {{#eq this "both"}}Both Buyer Agent and Mortgage Broker Services{{/eq}}
+        {{#eq this "buyer_agent"}}Buyer Agent Services{{/eq}}
+        {{#eq this "mortgage_broker"}}Mortgage Broker Services{{/eq}}
+      {{/set}}
+    {{/with}}
+    
+    <p>Thank you for contacting us. We have received your enquiry regarding <strong>{{displayServiceType}}</strong>.</p>
     
     <p>Our team is reviewing your request and will get back to you as soon as possible. Here's a summary of the information you provided:</p>
     
     <ul>
-      <li><strong>Service Type:</strong> {{serviceType}}</li>
+      <li><strong>Service Type:</strong> {{displayServiceType}}</li>
       <li><strong>Budget Range:</strong> {{budgetRange}}</li>
       <li><strong>Additional Information:</strong> {{additionalInfo}}</li>
     </ul>
