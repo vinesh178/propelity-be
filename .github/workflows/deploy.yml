@@ -29,5 +29,12 @@ jobs:
             # Make the scripts executable
             chmod +x docker-build.sh docker-run.sh
             
-            # Build and run the application
-            ./docker-build.sh && ./docker-run.sh
+            # Build and run the application, capture output
+            OUTPUT=$(./docker-build.sh && ./docker-run.sh 2>&1)
+            echo "$OUTPUT"
+            
+            # Check if deployment was successful
+            if ! echo "$OUTPUT" | grep -q "Containers started successfully. The application is available at http://localhost:3000"; then
+              echo "Deployment failed: Success message not found in output"
+              exit 1
+            fi
