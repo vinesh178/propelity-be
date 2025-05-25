@@ -27,42 +27,7 @@ jobs:
             fi
             
             # Make the scripts executable
-            chmod +x deploy.sh
+            chmod +x docker-build.sh docker-run.sh
             
-            # Deploy with bridge network first (more reliable)
-            echo "Deploying with bridge network configuration..."
-            ./deploy.sh
-            
-            # Copy diagnostic scripts to the container
-            CONTAINER_ID=$(docker-compose ps -q app)
-            echo "Container ID: $CONTAINER_ID"
-            
-            echo "Copying test scripts to container..."
-            docker cp src/network-test.js $CONTAINER_ID:/app/src/
-            docker cp src/docker-test-email.js $CONTAINER_ID:/app/src/
-            
-            # Run network tests
-            echo "Running network diagnostics..."
-            docker-compose exec -T app node src/network-test.js || echo "Network test failed, but continuing"
-            
-            # Test email connectivity
-            echo "Testing email functionality..."
-            docker-compose exec -T app node src/docker-test-email.js || echo "Email test failed, but deployment continues"
-            
-            # If needed, try host network as a last resort
-            if ! docker-compose exec -T app node src/docker-test-email.js | grep -q "Email sent successfully"; then
-              echo "Email test failed with bridge network, trying host network mode..."
-              ./deploy.sh --host-network
-              
-              # Copy test scripts again
-              CONTAINER_ID=$(docker-compose ps -q app)
-              docker cp src/network-test.js $CONTAINER_ID:/app/src/
-              docker cp src/docker-test-email.js $CONTAINER_ID:/app/src/
-              
-              # Final email test
-              docker-compose exec -T app node src/docker-test-email.js || echo "Email still failing, manual intervention needed"
-            fi
-            
-            # Final status check
-            echo "Final container status:"
-            docker-compose ps
+            # Build and run the application
+            ./docker-build.sh && ./docker-run.sh
