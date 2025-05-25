@@ -95,13 +95,16 @@ export async function createEnquiry(enquiry: Omit<Enquiry, 'id' | 'created_at'>)
 
     console.log('Successfully created enquiry in Supabase');
     
-    // Trigger Slack notification without affecting the main function flow
+    // Trigger notifications synchronously
     if (data && data.id) {
-      // Use setTimeout to make this non-blocking
-      setTimeout(() => {
-        handleNewEnquiryNotification(data.id)
-          .catch(err => console.error('Error in notification handler:', err));
-      }, 0);
+      try {
+        console.log('Triggering notifications for enquiry:', data.id);
+        await handleNewEnquiryNotification(data.id);
+        console.log('Notifications sent successfully for enquiry:', data.id);
+      } catch (notifyErr) {
+        console.error('Error sending notifications:', notifyErr);
+        // Don't fail the enquiry creation if notifications fail
+      }
     }
     
     return { data: data as Enquiry, error: null };
